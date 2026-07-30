@@ -1,0 +1,23 @@
+# ── Node ──
+frontend/node_modules
+
+# ── Python ──
+__pycache__/
+*.pyc
+.venv/
+.idea/
+
+# ── 비밀 ──
+# 백엔드용 .env (OPENAI_API_KEY, DB 비밀번호 등)만 제외한다.
+#
+# 반드시 앞에 / 를 붙일 것. 슬래시 없이 ".env" 라고 쓰면 이 패턴이
+# 모든 하위 폴더에 적용돼서 frontend/.env 까지 같이 무시된다.
+# 그러면 팀원이 클론했을 때 VITE_USE_MOCK 이 없는 상태로 빌드되고,
+# mock 이 꺼진 번들이 나와서 로그인이 안 된다.
+/.env
+.env.local
+*.env.local
+
+# ── 일부러 커밋하는 것 ──
+# app/static/   빌드 산출물. 팀원이 Node 없이 uvicorn 하나로 화면을 보게 하려고.
+# frontend/.env 비밀이 없는 팀 공통 설정. 빠지면 위의 mock 문제가 생긴다.

@@ -1,0 +1,447 @@
+/*
+ * 색은 의미다.
+ *
+ * 이 UI는 기본적으로 무채색이다. 신호색(--signal)은 "지금 서버에서 뭔가
+ * 돌고 있다"를 뜻할 때만 쓴다. 녹취 파이프라인이 이 제품의 유일한 특징이고,
+ * 화면에서 눈이 가야 할 곳도 거기 하나뿐이기 때문이다.
+ * 신호색을 장식으로 쓰기 시작하면 이 규칙이 무너진다.
+ */
+
+:root {
+  --paper: #fafaf7;
+  --surface: #ffffff;
+  --ink: #15181c;
+  --muted: #71767c;
+  --rule: #e4e4df;
+  --rule-soft: #f0f0ec;
+
+  --signal: #17795e;
+  --signal-soft: #e8f2ee;
+  --alert: #b0432a;
+
+  --font-ui: system-ui, -apple-system, "Segoe UI", "Noto Sans KR", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 메타데이터는 전부 모노스페이스. 상태·시각·라벨이 본문과 섞이지 않게 한다. */
+.meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ─── 레이아웃 ───────────────────────────────────────────────────── */
+
+.shell {
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  height: 100%;
+}
+
+.sidebar {
+  background: var(--paper);
+  border-right: 1px solid var(--rule);
+  padding: 20px 14px;
+  overflow-y: auto;
+}
+
+.main {
+  overflow-y: auto;
+  padding: 40px 44px 96px;
+}
+
+.main__inner {
+  max-width: 720px;
+}
+
+@media (max-width: 720px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .main {
+    padding: 24px 20px 64px;
+  }
+}
+
+/* ─── 사이드바 ───────────────────────────────────────────────────── */
+
+.brand {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.nav-group + .nav-group {
+  margin-top: 22px;
+}
+
+.nav-group__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 8px 6px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  padding: 6px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  background: var(--rule-soft);
+}
+
+.nav-item[aria-current="true"] {
+  background: var(--surface);
+  box-shadow: inset 2px 0 0 var(--ink);
+  font-weight: 500;
+}
+
+.nav-item--child {
+  padding-left: 22px;
+}
+
+.nav-item__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-empty {
+  padding: 4px 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* 처리 중임을 알리는 점. 사이드바에서만 쓴다 — 다른 화면에 있어도 보이라고. */
+.pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal);
+  flex: none;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse {
+    animation: none;
+  }
+}
+
+/* ─── 컨트롤 ─────────────────────────────────────────────────────── */
+
+.btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 7px 13px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn--primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.btn--quiet {
+  border-color: transparent;
+  color: var(--muted);
+  padding: 4px 6px;
+}
+
+.btn--quiet:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: transparent;
+  background: var(--rule-soft);
+}
+
+.input,
+.textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 8px 10px;
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.textarea {
+  min-height: 380px;
+  line-height: 1.75;
+  resize: vertical;
+}
+
+.title-input {
+  width: 100%;
+  font: inherit;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  border: 0;
+  padding: 0 0 10px;
+  background: none;
+  color: var(--ink);
+}
+
+.title-input:focus {
+  outline: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ─── 블록 ───────────────────────────────────────────────────────── */
+
+.panel {
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 16px 18px;
+  background: var(--surface);
+}
+
+.panel--soft {
+  background: var(--paper);
+}
+
+.panel + .panel,
+.stack > * + * {
+  margin-top: 16px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--rule);
+  border: 0;
+  margin: 28px 0;
+}
+
+.notice {
+  font-size: 13.5px;
+  color: var(--alert);
+  border-left: 2px solid var(--alert);
+  padding-left: 10px;
+}
+
+.transcript {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #33383e;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ─── 파이프라인 표시 ─────────────────────────────────────────────
+ * 이 화면의 signature. 대부분의 위키는 비동기 작업을 숨기지만
+ * 여기서는 그 과정 자체가 제품이라 단계를 그대로 드러낸다.
+ */
+
+.stages {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.stage__bar {
+  height: 3px;
+  background: var(--rule);
+  position: relative;
+  overflow: hidden;
+}
+
+.stage__label {
+  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stage--done .stage__bar {
+  background: var(--ink);
+}
+
+.stage--active .stage__bar::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fill, 0%);
+  background: var(--signal);
+  transition: width 0.4s ease-out;
+}
+
+.stage--active .stage__label {
+  color: var(--signal);
+}
+
+.stage--failed .stage__bar {
+  background: var(--alert);
+}
+
+.stage--failed .stage__label {
+  color: var(--alert);
+}
+
+/* ─── 로그인 ─────────────────────────────────────────────────────── */
+
+.login {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  padding: 24px;
+}
+
+.login__card {
+  width: 100%;
+  max-width: 330px;
+}
+
+.login__title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+
+.login__sub {
+  font-size: 13.5px;
+  color: var(--muted);
+  margin: 0 0 22px;
+}
+
+.field + .field {
+  margin-top: 10px;
+}
+
+.field__label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* ─── 챗봇 ───────────────────────────────────────────────────────── */
+
+.bubble {
+  padding: 10px 13px;
+  border-radius: 4px;
+  font-size: 14.5px;
+  max-width: 90%;
+}
+
+.bubble--me {
+  background: var(--ink);
+  color: var(--paper);
+  margin-left: auto;
+}
+
+.bubble--bot {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+}
+
+.source {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  padding: 6px 8px;
+  border-left: 2px solid var(--rule);
+  cursor: pointer;
+}
+
+.source:hover {
+  color: var(--ink);
+  border-left-color: var(--ink);
+}
