@@ -7,3 +7,9 @@ pydantic-settings
 python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
+# ── RAG 파트 추가 ──
+faiss-cpu
+numpy
+pypdf
+# EMBEDDING_BACKEND=gemini 전환 시 필요:
+# google-genai

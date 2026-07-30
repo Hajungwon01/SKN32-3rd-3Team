@@ -6,6 +6,9 @@ __pycache__/
 *.pyc
 .venv/
 .idea/
+*.py[cod]
+*.egg-info/
+.Python
 
 # ── 비밀 ──
 # 백엔드용 .env (OPENAI_API_KEY, DB 비밀번호 등)만 제외한다.
@@ -21,3 +24,23 @@ __pycache__/
 # ── 일부러 커밋하는 것 ──
 # app/static/   빌드 산출물. 팀원이 Node 없이 uvicorn 하나로 화면을 보게 하려고.
 # frontend/.env 비밀이 없는 팀 공통 설정. 빠지면 위의 mock 문제가 생긴다.
+
+# ───────── RAG 인덱스 산출물 (rebuild로 재생성 가능) ─────────
+data/indexes/*.faiss
+data/indexes/*.json
+
+# ───────── RAG 테스트 문서 (개인 로컬 자료) ─────────
+data/docs/*
+!data/docs/.gitkeep
+
+# ───────── IDE ─────────
+.idea/
+.vscode/
+*.swp
+
+# ───────── OS ─────────
+.DS_Store
+Thumbs.db
+
+# ───────── 로그 ─────────
+*.log
