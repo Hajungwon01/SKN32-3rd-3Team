@@ -3,7 +3,9 @@ uvicorn
 sqlalchemy
 pymysql
 pydantic
+pydantic[email]
 pydantic-settings
 python-jose[cryptography]
 passlib[bcrypt]
+bcrypt<4.1
 python-multipart

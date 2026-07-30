@@ -1,37 +1,38 @@
 """
-프론트 확인용 최소 서버.
+FastAPI 진입점.
 
-A안과 B안에서 이 파일은 완전히 동일하다. app/static/ 에 손으로 쓴 소스가
-들어있든 빌드 산출물이 들어있든 FastAPI 입장에서는 같은 파일 묶음이기 때문이다.
-
-    uvicorn app.main:app --reload
-    http://localhost:8000
-
-A가 실제 라우터를 만들면 아래 include_router 자리에 넣는다.
+app.routers.api 의 실제 인증/문서/요약 라우터를 등록하고,
+그 아래에 app/static/ (프론트 빌드 산출물)을 서빙한다.
 """
 
 from pathlib import Path
 
-from fastapi import APIRouter, FastAPI
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+
+from app.database import Base, engine
+# 모델을 import 해야 Base.metadata에 테이블이 등록된다.
+from app import models  # noqa: F401
+from app.routers.api import router as api_router
 
 BASE = Path(__file__).resolve().parent
 
 app = FastAPI(title="팀 위키")
 
+# 개발 편의용: 테이블이 없으면 만든다.
+# (운영 전환 시에는 Alembic 같은 마이그레이션 도구로 교체할 것.)
+Base.metadata.create_all(bind=engine)
+
 # ─── API 를 먼저 등록한다 ────────────────────────────────────────────
 # 아래 정적 마운트가 "/" 를 잡으므로, 순서가 바뀌면 /api 요청까지
 # 정적 파일 처리기가 가로채서 404가 난다. 이 순서는 습관으로 지킬 것.
 
-api = APIRouter()
+app.include_router(api_router, prefix="/api")
 
 
-@api.get("/health")
+@app.get("/api/health")
 def health():
     return {"ok": True}
-
-
-app.include_router(api, prefix="/api")
 
 
 # ─── 정적 파일 ───────────────────────────────────────────────────────
