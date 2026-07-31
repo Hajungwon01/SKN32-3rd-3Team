@@ -1,17 +1,21 @@
-# path : scripts/seed_laws.py
+# path : scripts/seed_docs.py
 """
-[RAG 파트] 법령 텍스트를 documents 테이블에 적재하고 인덱스를 만든다.
+[RAG 파트] 공용 문서(법령·가이드)를 documents 테이블에 적재하고 인덱스를 만든다.
 
-    python -m scripts.seed_laws
+    python -m scripts.seed_docs
 
 동작
-  1. 시스템 계정(system@local)이 없으면 만든다 — documents.owner_id 가 NOT NULL 이라 필요
-  2. data/laws/*.{txt,md,pdf} 를 읽어 source_type="law" 로 저장 (같은 제목이면 갱신)
+  1. 시스템 계정 + 로그인용 데모 계정을 만든다
+     (documents.owner_id 가 NOT NULL 이고, 프론트에 회원가입 화면이 없기 때문)
+  2. data/laws/*   → source_type="law"   (조문 단위로 청킹)
+     data/guides/* → source_type="guide" (품목 블록 단위로 청킹)
   3. 벡터 인덱스를 재생성한다
 
-파일명이 그대로 문서 제목이 된다. 예) `자원순환기본법.pdf` → "자원순환기본법"
 지원 형식: .txt / .md / .pdf (PDF는 머리말·페이지번호를 자동 제거)
-답변에서 "자원순환기본법 제3조에 따르면…" 처럼 인용되므로 정식 법령명을 쓸 것.
+
+문서 제목
+  파일 첫 줄이 "[" 로 시작하면 그 줄을 제목으로 쓰고, 아니면 파일명을 쓴다.
+  답변에서 "서울시 기준으로는…" 처럼 인용되므로 지역이 드러나는 제목이 좋다.
 """
 
 from __future__ import annotations
@@ -34,8 +38,11 @@ DEMO_PASSWORD = "demo1234"
 
 SUPPORTED = (".txt", ".md", ".pdf")
 
-# 폴더 안내문 등 법령이 아닌 파일은 제외한다
+# 폴더 안내문 등 자료가 아닌 파일은 제외한다
 IGNORED_STEMS = {"readme", "read_me", "notes", "메모"}
+
+
+# ─────────────────── 계정 ───────────────────
 
 
 def _get_hasher():
@@ -70,23 +77,25 @@ def get_or_create_user(db, email: str, password: str, display_name: str) -> User
     return user
 
 
-def get_or_create_system_user(db) -> User:
-    """법령 문서의 소유자로 쓸 시스템 계정을 확보한다."""
-    return get_or_create_user(db, SYSTEM_EMAIL, SYSTEM_PASSWORD, "시스템")
+# ─────────────────── 파일 읽기 ───────────────────
 
 
-def load_law_files() -> list[tuple[str, str]]:
-    """data/laws 의 txt·md·pdf 를 (제목, 정제 본문) 목록으로 읽는다.
+def _extract_title(text: str, fallback: str) -> str:
+    """첫 줄이 "[서울시] …" 형태면 제목으로 쓰고, 아니면 파일명을 쓴다."""
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        return line if line.startswith("[") and len(line) <= 80 else fallback
+    return fallback
 
-    PDF는 머리말·꼬리말·페이지번호를 제거하고 줄바꿈을 정리한 뒤 반환한다.
-    조문이 하나도 인식되지 않으면 경고한다 — 추출이 잘못됐을 가능성이 높다.
-    """
-    laws_dir = settings.LAWS_DIR
-    laws_dir.mkdir(parents=True, exist_ok=True)
 
-    items: list[tuple[str, str]] = []
+def load_folder(folder, source_type: str) -> list[tuple[str, str, str]]:
+    """폴더의 문서를 (제목, 본문, source_type) 목록으로 읽는다."""
+    folder.mkdir(parents=True, exist_ok=True)
+    items: list[tuple[str, str, str]] = []
 
-    for path in sorted(laws_dir.iterdir()):
+    for path in sorted(folder.iterdir()):
         if not (path.is_file() and path.suffix.lower() in SUPPORTED):
             continue
         if path.stem.lower() in IGNORED_STEMS or path.stem.startswith("_"):
@@ -102,34 +111,51 @@ def load_law_files() -> list[tuple[str, str]]:
             print(f"  [건너뜀] 내용이 비어 있습니다: {path.name}")
             continue
 
-        articles = count_articles(text)
-        if articles == 0:
-            print(f"  [경고] {path.name}: 조문(제N조)을 찾지 못했습니다.")
-            print("         일반 문자 단위로 분할되어 조문 인용이 어려울 수 있습니다.")
-        else:
-            print(f"  읽음: {path.name} — 조문 {articles}개, {len(text):,}자")
+        title = _extract_title(text, path.stem)
 
-        items.append((path.stem, text))
+        if source_type == "law":
+            articles = count_articles(text)
+            if articles == 0:
+                print(f"  [경고] {path.name}: 조문(제N조)을 찾지 못했습니다.")
+                print("         일반 문자 단위로 분할되어 조문 인용이 어려울 수 있습니다.")
+            else:
+                print(f"  법령  : {title} — 조문 {articles}개, {len(text):,}자")
+        else:
+            print(f"  가이드: {title} — {len(text):,}자")
+
+        items.append((title, text, source_type))
 
     return items
+
+
+def load_public_docs() -> list[tuple[str, str, str]]:
+    """법령·가이드 폴더를 모두 읽는다."""
+    return (
+        load_folder(settings.LAWS_DIR, "law")
+        + load_folder(settings.GUIDES_DIR, "guide")
+    )
+
+
+# ─────────────────── 메인 ───────────────────
 
 
 def main() -> None:
     Base.metadata.create_all(bind=engine)
 
-    print("[1/3] 법령 파일 읽기")
-    laws = load_law_files()
-    if not laws:
-        print(f"[중단] {settings.LAWS_DIR} 에 법령 파일이 없습니다. (txt·md·pdf)")
-        print("       국가법령정보센터에서 조문을 복사해 저장한 뒤 다시 실행하세요.")
+    print("[1/3] 공용 문서 읽기")
+    docs = load_public_docs()
+
+    if not docs:
+        print(f"[중단] {settings.LAWS_DIR} 와 {settings.GUIDES_DIR} 에 파일이 없습니다.")
+        print("       txt·md·pdf 를 넣은 뒤 다시 실행하세요.")
         return
 
     with SessionLocal() as db:
         print("\n[2/3] 계정 확인 및 DB 적재")
-        owner = get_or_create_system_user(db)
+        owner = get_or_create_user(db, SYSTEM_EMAIL, SYSTEM_PASSWORD, "시스템")
         get_or_create_user(db, DEMO_EMAIL, DEMO_PASSWORD, "데모 사용자")
 
-        for title, content in laws:
+        for title, content, source_type in docs:
             doc = (
                 db.query(Document)
                 .filter(Document.title == title, Document.owner_id == owner.id)
@@ -139,7 +165,7 @@ def main() -> None:
             if doc:
                 doc.content = content
                 doc.content_text = content
-                doc.source_type = SourceType.law
+                doc.source_type = SourceType(source_type)
                 action = "갱신"
             else:
                 db.add(
@@ -148,12 +174,12 @@ def main() -> None:
                         title=title,
                         content=content,
                         content_text=content,
-                        source_type=SourceType.law,
+                        source_type=SourceType(source_type),
                     )
                 )
                 action = "추가"
 
-            print(f"  {action}: {title}")
+            print(f"  {action}: [{source_type}] {title}")
 
         db.commit()
 

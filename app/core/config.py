@@ -42,6 +42,15 @@ class Settings(BaseSettings):
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-001"
     GEMINI_EMBEDDING_DIMENSION: int = 768
 
+    # 임베딩 API 는 요청 1건당 최대 100개까지 받는다. 그 이하로만 설정할 것.
+    GEMINI_EMBEDDING_BATCH: int = 100
+
+    # 배치 사이 대기(초). 분당 요청 제한을 피하기 위한 여유.
+    GEMINI_BATCH_DELAY: float = 2.0
+
+    # 429 를 만났을 때 재시도 대기(초). 시도마다 배수로 늘어난다.
+    GEMINI_RETRY_WAIT: int = 30
+
     # Gemini API 키 (팀 config에 이미 있다면 이 줄은 생략)
     GEMINI_API_KEY: str = ""
 
@@ -53,6 +62,9 @@ class Settings(BaseSettings):
 
     # 법령 원문 txt 폴더 (시드 적재 스크립트가 읽는 곳)
     LAWS_DIR: Path = BASE_DIR / "data" / "laws"
+
+    # 기관 배출 가이드 폴더 (환경부·지자체 안내문)
+    GUIDES_DIR: Path = BASE_DIR / "data" / "guides"
 
     # 유사도 임계값. 이 점수 미만이면 근거 없음으로 보고 LLM을 호출하지 않는다.
     # (환각 방지 1차 장치)
