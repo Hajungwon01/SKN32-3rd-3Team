@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+sqlalchemy
+pymysql
+pydantic
+pydantic[email]
+pydantic-settings
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt<4.1
+python-multipart
+# ── RAG 파트 추가 ──
+faiss-cpu
+numpy
+pypdf
+google-genai        # Gemini 답변 생성 + 임베딩
