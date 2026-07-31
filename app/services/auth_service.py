@@ -19,12 +19,12 @@ def register_user(db: Session, user_data: UserCreate) -> User:
     db.refresh(new_user)
     return new_user
 
-def authenticate_user(db: Session, email: str, password: str):
+def authenticate_user(db: Session, email: str, password: str) -> tuple[User, str]:
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 일치하지 않습니다.")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="비활성화된 계정입니다.")
-    
+
     access_token = create_access_token(data={"sub": str(user.id)})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return user, access_token
