@@ -35,6 +35,7 @@ frontend/.env                 VITE_USE_MOCK=false
 
 ```bash
 # 1) 패키지
+python -m pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
 
 # 2) DB 재생성 — SourceType 에 law 가 추가되어 기존 테이블과 맞지 않는다
@@ -43,7 +44,9 @@ del test.db          # Windows
 # rm test.db         # Mac/Linux
 
 # 3) 법령 적재 + 인덱스 생성
-python -m scripts.seed_laws
+
+# .env에 SECRET_KEY= 랜덤 값
+python -m scripts.seed_docs
 
 # 4) 서버
 python -m uvicorn app.main:app --reload

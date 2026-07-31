@@ -33,6 +33,8 @@ NEW_BLOCK = re.compile(
     r"|\d+\.\s"               # 1. 
     r"|[가-힣]\.\s"           # 가. 
     r"|부\s*칙"
+    r"|\[.+\]\s*$"          # [종이류] 같은 품목 머리글
+    r"|=+\s*.+\s*=+\s*$"    # === 품목별 분리배출 요령 ===
     r")"
 )
 
@@ -44,12 +46,12 @@ def read_law_file(path: Path) -> str:
     if suffix == ".pdf":
         return clean_law_text(_extract_pdf_pages(path))
 
-    # txt·md 는 페이지 개념이 없으므로 한 덩어리로 취급
+    # txt·md 는 줄 구조가 이미 온전하므로 정제하지 않는다.
+    # (PDF용 줄 잇기를 적용하면 가이드 문서의 "[종이류]" 같은 블록 구분이 사라진다)
     try:
-        text = path.read_text(encoding="utf-8")
+        return path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        text = path.read_text(encoding="cp949")  # 메모장 저장 대비
-    return clean_law_text([text])
+        return path.read_text(encoding="cp949")  # 메모장 저장 대비
 
 
 def _extract_pdf_pages(path: Path) -> list[str]:

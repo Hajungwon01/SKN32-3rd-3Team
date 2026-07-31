@@ -21,7 +21,7 @@ from app.core.security import decode_access_token
 
 router = APIRouter()
 
-# 프론트와의 계약(frontend/README.md): 인증은 세션 쿠키, JWT/Bearer 아님.
+# 프론트와의 계약(frontend/README_guide.md): 인증은 세션 쿠키, JWT/Bearer 아님.
 # 실제로는 여전히 JWT를 쓰지만, Authorization 헤더 대신 httpOnly 쿠키에 담아
 # 발급/검증한다 — 프론트는 이 토큰의 존재를 전혀 몰라도 된다.
 COOKIE_NAME = "access_token"
