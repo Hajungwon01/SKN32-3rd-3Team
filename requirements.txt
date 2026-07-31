@@ -9,10 +9,8 @@ python-jose[cryptography]
 passlib[bcrypt]
 bcrypt<4.1
 python-multipart
-python-multipart
 # ── RAG 파트 추가 ──
 faiss-cpu
 numpy
 pypdf
-# EMBEDDING_BACKEND=gemini 전환 시 필요:
-# google-genai
+google-genai        # Gemini 답변 생성 + 임베딩

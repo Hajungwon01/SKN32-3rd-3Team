@@ -3,12 +3,16 @@
 [RAG 파트] 청킹·임베딩·벡터 검색·답변 생성을 조합하는 오케스트레이터.
 
   - rebuild_index() : 문서 전체 → 청킹 → 임베딩 → FAISS 재구축
-  - search()        : 질문과 유사한 청크 검색 (소유자 필터링 지원)
+  - search()        : 질문과 유사한 청크 검색 (소유자 필터 + 유사도 임계값)
   - ask()           : 검색 결과를 근거로 답변 + 출처 반환
 
-문서 출처는 .env 의 RAG_SOURCE 로 전환합니다.
-  - "db"    : MySQL documents 테이블 (기본)
+문서 출처는 .env 의 RAG_SOURCE 로 전환한다.
+  - "db"    : documents 테이블 (기본)
   - "files" : data/docs 폴더의 txt/md/pdf (DB 없이 단독 테스트용)
+
+공용 문서:
+  법령(source_type="law")은 소유자와 무관하게 모든 사용자가 검색할 수 있다.
+  개인 문서는 본인 것만 검색된다.
 """
 
 from __future__ import annotations
@@ -18,19 +22,36 @@ from pathlib import Path
 from app.core.config import settings
 from app.services import chunk_service, embedding_service, vector_store_service
 
+# 소유자와 무관하게 전체 공개되는 문서 유형
+PUBLIC_SOURCE_TYPES = ("law", "guide")
+
 # 프론트에 돌려줄 근거 미리보기 길이
-SNIPPET_LENGTH = 120
+SNIPPET_LENGTH = 140
+
+
+def _effective_min_score(min_score: float | None) -> float:
+    """유사도 임계값을 결정한다.
+
+    local 임베딩은 해시 기반이라 점수 스케일이 gemini 와 다르다.
+    (local 0.05~0.15 / gemini 0.5~0.8 수준)
+    같은 임계값을 쓰면 local 에서는 모든 결과가 걸러지므로 분리한다.
+    """
+    if min_score is not None:
+        return min_score
+    if settings.EMBEDDING_BACKEND.lower() == "local":
+        return settings.RAG_MIN_SCORE_LOCAL
+    return settings.RAG_MIN_SCORE
 
 
 # ─────────────────── 공개 API ───────────────────
 
 
 def rebuild_index(db=None) -> dict:
-    """문서 전체를 다시 인덱싱합니다.
+    """문서 전체를 다시 인덱싱한다.
 
     전체 재구축 방식을 쓰는 이유:
-      문서 수정·삭제 시 FAISS 와의 동기화 문제를 피하는 가장 단순한 방법입니다.
-      문서량이 적은 초기 단계에서는 몇 초면 끝나므로 증분 갱신은 추후 과제로 둡니다.
+      문서 수정·삭제 시 FAISS 와의 동기화 문제를 피하는 가장 단순한 방법이다.
+      문서량이 적은 초기 단계에서는 몇 초면 끝나므로 증분 갱신은 추후 과제로 둔다.
     """
     documents = _load_documents(db)
     chunks = chunk_service.build_chunks(documents)
@@ -52,21 +73,31 @@ def search(
     query: str,
     top_k: int | None = None,
     owner_id: int | None = None,
+    min_score: float | None = None,
 ) -> list[dict]:
-    """질문과 유사한 청크를 점수 순으로 반환합니다.
+    """질문과 유사한 청크를 점수 순으로 반환한다.
 
-    owner_id 를 넘기면 해당 사용자의 문서에서 나온 청크만 반환합니다.
-    (인덱스는 전체 문서를 담으므로, 타인 문서 노출을 막으려면 필수)
+    owner_id 를 넘기면 "본인 문서 + 공용 법령"만 남긴다.
+    min_score 미만인 결과는 근거로 삼기에 부족하다고 보고 제외한다.
     """
     top_k = top_k or settings.RAG_TOP_K
+    min_score = _effective_min_score(min_score)
+
     query_vector = embedding_service.embed_query(query)
 
-    # 필터링 후에도 top_k 개를 채우기 위해 넉넉히 검색한 뒤 잘라냅니다.
-    fetch_k = top_k * 5 if owner_id is not None else top_k
+    # 필터링 후에도 top_k 개를 채우기 위해 넉넉히 검색한 뒤 잘라낸다.
+    fetch_k = top_k * 5 if owner_id is not None else top_k * 2
     results = vector_store_service.search(query_vector, fetch_k)
 
     if owner_id is not None:
-        results = [r for r in results if r.get("owner_id") == owner_id]
+        results = [
+            r for r in results
+            if r.get("owner_id") == owner_id
+            or r.get("source_type") in PUBLIC_SOURCE_TYPES
+        ]
+
+    # 유사도 임계값 (환각 방지 1차 장치)
+    results = [r for r in results if r.get("score", 0.0) >= min_score]
 
     return results[:top_k]
 
@@ -76,49 +107,72 @@ def ask(
     top_k: int | None = None,
     owner_id: int | None = None,
 ) -> dict:
-    """검색된 문맥을 근거로 답변을 생성합니다.
+    """검색된 문맥을 근거로 답변을 생성한다.
 
-    반환 형식은 프론트 types/api.ts 의 ChatResponse 와 동일합니다.
+    반환 형식은 프론트 types/api.ts 의 ChatResponse 와 동일하다.
         {"answer": str,
          "sources": [{"document_id": int, "title": str, "snippet": str}, ...]}
     """
     results = search(question, top_k, owner_id)
 
+    # 근거가 없으면 LLM을 호출하지 않는다. (환각 방지)
     if not results:
         return {
-            "answer": "관련 문서를 찾지 못했습니다. 문서를 먼저 작성하거나 인덱스를 재생성해 주세요.",
+            "answer": (
+                "관련 조문을 찾을 수 없습니다. "
+                "질문을 조금 더 구체적으로 바꾸거나, 관련 법령이 등록되어 있는지 확인해 주세요."
+            ),
             "sources": [],
         }
 
-    # 검색된 청크들을 [출처] 표기와 함께 하나의 컨텍스트 문자열로 조립
-    context = "\n\n".join(
-        f"[출처: {item['title']}]\n{item['content']}" for item in results
-    )
-
     return {
-        "answer": _generate_answer(question, context),
+        "answer": _generate_answer(question, _build_context(results)),
         "sources": _build_sources(results),
     }
 
 
+# ─────────────────── 컨텍스트·출처 조립 ───────────────────
+
+
+def _build_context(results: list[dict]) -> str:
+    """검색된 청크를 LLM에 넘길 하나의 문자열로 조립한다.
+
+    출처 표기에 조문 번호를 포함시켜, LLM이 답변에서 그대로 인용할 수 있게 한다.
+        [근거 1 · 자원순환법 제15조]
+        ...본문...
+    """
+    blocks: list[str] = []
+
+    for i, item in enumerate(results, start=1):
+        label = item.get("title", "제목 없음")
+        if item.get("article"):
+            label = f"{label} {item['article']}"
+        blocks.append(f"[근거 {i} · {label}]\n{item['content']}")
+
+    return "\n\n".join(blocks)
+
+
 def _build_sources(results: list[dict]) -> list[dict]:
-    """검색 결과를 프론트 ChatSource 형식으로 변환합니다. (문서당 1개, 등장순)"""
+    """검색 결과를 프론트 ChatSource 형식으로 변환한다.
+
+    같은 문서라도 조문이 다르면 별개 근거이므로 (document_id, article) 단위로 묶는다.
+    """
     sources: list[dict] = []
     seen: set = set()
 
     for item in results:
-        doc_id = item.get("document_id")
-        if doc_id in seen:
+        key = (item.get("document_id"), item.get("article"))
+        if key in seen:
             continue
-        seen.add(doc_id)
+        seen.add(key)
 
-        snippet = " ".join(item["content"].split())  # 줄바꿈·공백 정리
+        snippet = " ".join(item["content"].split())  # 줄바꿈·중복 공백 정리
         if len(snippet) > SNIPPET_LENGTH:
             snippet = snippet[:SNIPPET_LENGTH] + "…"
 
         sources.append(
             {
-                "document_id": doc_id,
+                "document_id": item.get("document_id"),
                 "title": item.get("title", "제목 없음"),
                 "snippet": snippet,
             }
@@ -131,17 +185,17 @@ def _build_sources(results: list[dict]) -> list[dict]:
 
 
 def _load_documents(db=None) -> list[dict]:
-    """인덱싱 대상 문서를 [{"id", "owner_id", "title", "content"}, ...] 로 반환합니다."""
+    """인덱싱 대상 문서를 [{"id","owner_id","title","content","source_type"}, ...] 로 반환."""
     if settings.RAG_SOURCE.lower() == "files":
         return _load_from_files()
     return _load_from_db(db)
 
 
 def _load_from_db(db=None) -> list[dict]:
-    """MySQL documents 테이블에서 문서를 읽습니다. (RAG_SOURCE=db)
+    """documents 테이블에서 문서를 읽는다. (RAG_SOURCE=db)
 
-    본문·요약·평문(content_text)이 있으면 모두 합쳐 인덱싱합니다.
-    녹취록과 요약본도 documents 에 저장되므로 STT 파트와 별도 연동이 필요 없습니다.
+    content_text(평문) → content → summary 순으로 채워진 값을 사용한다.
+    프론트가 content 에 에디터 JSON을 저장하므로 평문인 content_text 가 우선이다.
     """
     from app.database import SessionLocal
     from app.models import Document
@@ -153,7 +207,6 @@ def _load_from_db(db=None) -> list[dict]:
         documents: list[dict] = []
 
         for row in session.query(Document).all():
-            # 프론트가 content_text(평문)를 보내는 스키마로 바뀌어도 자동 대응
             candidates = [
                 getattr(row, "content_text", None),
                 row.content,
@@ -163,12 +216,18 @@ def _load_from_db(db=None) -> list[dict]:
             if not parts:
                 continue
 
+            source_type = row.source_type
+            # SQLAlchemy Enum 이면 .value, 문자열이면 그대로
+            source_type = getattr(source_type, "value", source_type)
+
             documents.append(
                 {
                     "id": row.id,
                     "owner_id": row.owner_id,
                     "title": row.title,
-                    "content": "\n\n".join(parts),
+                    # 법령은 조문 단위 분할을 위해 평문 하나만 쓴다
+                    "content": parts[0] if source_type == "law" else "\n\n".join(parts),
+                    "source_type": source_type,
                 }
             )
 
@@ -182,7 +241,10 @@ def _load_from_db(db=None) -> list[dict]:
 
 
 def _load_from_files() -> list[dict]:
-    """data/docs 폴더에서 문서를 읽습니다. (RAG_SOURCE=files, DB 없이 테스트용)"""
+    """data/docs 폴더에서 문서를 읽는다. (RAG_SOURCE=files, DB 없이 테스트용)
+
+    파일명이 '[법령]' 으로 시작하면 법령으로 간주해 조문 단위로 청킹한다.
+    """
     settings.DOCS_DIR.mkdir(parents=True, exist_ok=True)
     supported = {".txt", ".md", ".pdf"}
 
@@ -199,9 +261,10 @@ def _load_from_files() -> list[dict]:
         documents.append(
             {
                 "id": i,           # 임시 id (파일 모드 전용)
-                "owner_id": None,  # 파일 모드에는 소유자 개념이 없음
+                "owner_id": None,
                 "title": path.stem,
                 "content": text,
+                "source_type": "law" if path.stem.startswith("[법령]") else "manual",
             }
         )
 
@@ -213,15 +276,14 @@ def _load_from_files() -> list[dict]:
 
 
 def _read_file(path: Path) -> str:
-    """확장자에 맞는 방식으로 텍스트를 추출합니다."""
-
+    """확장자에 맞는 방식으로 텍스트를 추출한다."""
     if path.suffix.lower() == ".pdf":
         try:
             from pypdf import PdfReader
         except ImportError:
             print("[RAG] pypdf 가 설치되지 않았습니다.  pip install pypdf")
             return ""
-        return "\n".join(page.extract_text() or "" for page in PdfReader(str(path)).pages)
+        return "\n".join(p.extract_text() or "" for p in PdfReader(str(path)).pages)
 
     # Windows 메모장으로 저장한 파일은 cp949 인 경우가 있어 대비
     try:
@@ -234,13 +296,10 @@ def _read_file(path: Path) -> str:
 
 
 def _generate_answer(question: str, context: str) -> str:
-    """컨텍스트를 근거로 답변을 생성합니다.
+    """컨텍스트를 근거로 답변을 생성한다.
 
-    1순위: gemini_service.answer_with_context() 가 있으면 사용
-    2순위: 없으면 검색된 원문을 그대로 보여주는 대체 답변
-
-    → gemini_service 에 함수가 추가되는 순간 자동으로 1순위로 전환되므로
-      이 파일은 수정할 필요가 없습니다.
+    gemini_service.answer_with_context() 가 있으면 사용하고,
+    없으면 검색된 원문을 그대로 보여주는 대체 답변을 반환한다.
     """
     try:
         from app.services import gemini_service
@@ -248,9 +307,6 @@ def _generate_answer(question: str, context: str) -> str:
         if hasattr(gemini_service, "answer_with_context"):
             return gemini_service.answer_with_context(question, context)
     except ImportError:
-        pass  # gemini_service 미구현 상태
+        pass
 
-    return (
-        "[LLM 미연결 상태 · 검색 결과 원문]\n"
-        f"{context}"
-    )
+    return f"[LLM 미연결 상태 · 검색 결과 원문]\n{context}"

@@ -8,6 +8,7 @@ class SourceType(str, enum.Enum):
     manual = "manual"
     meeting_transcript = "meeting_transcript"
     meeting_summary = "meeting_summary"
+    law = "law"                  # 법령 원문 (공용 문서 · RAG 파트 추가)
 
 class User(Base):
     __tablename__ = "users"

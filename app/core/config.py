@@ -51,6 +51,20 @@ class Settings(BaseSettings):
     # (개발 단계 전용) MySQL 연결 전 문서를 읽어올 임시 폴더
     DOCS_DIR: Path = BASE_DIR / "data" / "docs"
 
+    # 법령 원문 txt 폴더 (시드 적재 스크립트가 읽는 곳)
+    LAWS_DIR: Path = BASE_DIR / "data" / "laws"
+
+    # 유사도 임계값. 이 점수 미만이면 근거 없음으로 보고 LLM을 호출하지 않는다.
+    # (환각 방지 1차 장치)
+    RAG_MIN_SCORE: float = 0.15
+
+    # local 임베딩은 표면 문자열 일치만 잡아 점수 스케일이 훨씬 낮다.
+    # 같은 임계값을 쓰면 전부 걸러지므로 개발용으로 따로 둔다.
+    RAG_MIN_SCORE_LOCAL: float = 0.05
+
+    # 답변 생성에 쓸 Gemini 모델
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
     # ═══════════════ RAG 설정 (여기까지) ═══════════════
 
 settings = Settings()

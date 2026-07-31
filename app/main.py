@@ -36,7 +36,7 @@ def health():
     return {"ok": True}
 
 
-app.include_router(api, prefix="/api")
+# app.include_router(api, prefix="/api")
 app.include_router(rag.router, prefix="/api")
 
 # ─── 정적 파일 ───────────────────────────────────────────────────────
