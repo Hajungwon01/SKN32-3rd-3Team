@@ -18,7 +18,7 @@ from app.routers import rag
 
 BASE = Path(__file__).resolve().parent
 
-app = FastAPI(title="팀 위키")
+app = FastAPI(title="Ecobot")
 
 # 개발 편의용: 테이블이 없으면 만든다.
 # (운영 전환 시에는 Alembic 같은 마이그레이션 도구로 교체할 것.)
@@ -44,4 +44,4 @@ app.include_router(rag.router, prefix="/api")
 # 나중에 클라이언트 라우터를 넣으면 알 수 없는 경로가 404가 되므로
 # index.html 로 떨어뜨리는 catch-all 라우트가 추가로 필요해진다.
 
-app.mount("/", StaticFiles(directory=BASE / "static", html=True), name="static")
+app.mount("/", StaticFiles(directory=BASE.parent / "static", html=True), name="static")
