@@ -1,16 +1,26 @@
+﻿# ── 웹 서버 ──
 fastapi
 uvicorn
+python-multipart
+
+# ── DB / ORM ──
 sqlalchemy
 pymysql
+
+# ── 설정 / 검증 ──
 pydantic
 pydantic[email]
 pydantic-settings
+
+# ── 인증 (JWT + 비밀번호 해싱) ──
 python-jose[cryptography]
 passlib[bcrypt]
 bcrypt<4.1
-python-multipart
-# ── RAG 파트 추가 ──
+
+# ── RAG 파이프라인 ──
 faiss-cpu
 numpy
 pypdf
-google-genai        # Gemini 답변 생성 + 임베딩
+
+# ── LLM / 임베딩 (Gemini) ──
+google-genai
