@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import hashlib
+import time
 
 import numpy as np
 
@@ -88,7 +89,11 @@ def _embed_local(text: str) -> list[float]:
 def _embed_gemini(texts: list[str]) -> list[list[float]]:
     """Gemini Embeddings API 호출 (실서비스용).
 
-    google-genai 패키지가 필요하며, 통합 단계에서 requirements에 추가:
+    API 가 요청 1건당 최대 100개까지만 받으므로 배치로 쪼개 보낸다.
+    (초과 시 400 INVALID_ARGUMENT: at most 100 requests can be in one batch)
+
+    무료 등급은 분당 요청 수 제한도 있어서, 429 가 나면 잠깐 쉬었다 다시 시도한다.
+
         pip install google-genai
     """
     if not settings.GEMINI_API_KEY:
@@ -102,11 +107,37 @@ def _embed_gemini(texts: list[str]) -> list[list[float]]:
     from google.genai import types
 
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    response = client.models.embed_content(
-        model=settings.GEMINI_EMBEDDING_MODEL,
-        contents=texts,
-        config=types.EmbedContentConfig(
-            output_dimensionality=settings.GEMINI_EMBEDDING_DIMENSION,
-        ),
+    config = types.EmbedContentConfig(
+        output_dimensionality=settings.GEMINI_EMBEDDING_DIMENSION,
     )
-    return [list(e.values) for e in response.embeddings]
+
+    batch_size = max(1, min(settings.GEMINI_EMBEDDING_BATCH, 100))
+    total = len(texts)
+    vectors: list[list[float]] = []
+
+    for start in range(0, total, batch_size):
+        batch = texts[start : start + batch_size]
+
+        for attempt in range(1, 4):  # 최대 3회 시도
+            try:
+                response = client.models.embed_content(
+                    model=settings.GEMINI_EMBEDDING_MODEL,
+                    contents=batch,
+                    config=config,
+                )
+                vectors.extend(list(e.values) for e in response.embeddings)
+                break
+            except Exception as exc:
+                # 분당 요청 제한(429)이면 기다렸다 재시도, 그 외에는 즉시 중단
+                if "429" not in str(exc) and "RESOURCE_EXHAUSTED" not in str(exc):
+                    raise
+                if attempt == 3:
+                    raise
+                wait = 20 * attempt
+                print(f"    요청 한도 초과. {wait}초 대기 후 재시도 ({attempt}/3)")
+                time.sleep(wait)
+
+        done = min(start + batch_size, total)
+        print(f"    임베딩 {done}/{total}")
+
+    return vectors

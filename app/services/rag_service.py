@@ -22,11 +22,14 @@ from pathlib import Path
 from app.core.config import settings
 from app.services import chunk_service, embedding_service, vector_store_service
 
-# 소유자와 무관하게 전체 공개되는 문서 유형
+# 소유자와 무관하게 전체 공개되는 문서 유형 (수집한 공공자료)
 PUBLIC_SOURCE_TYPES = ("law", "guide")
 
 # 프론트에 돌려줄 근거 미리보기 길이
 SNIPPET_LENGTH = 140
+
+# 근거가 없을 때 쓰는 문구. 프롬프트의 지시문과 같은 표현을 쓴다.
+NO_ANSWER = "관련 자료를 찾을 수 없습니다"
 
 
 def _effective_min_score(min_score: float | None) -> float:
@@ -151,19 +154,33 @@ def ask(
 def _build_context(results: list[dict]) -> str:
     """검색된 청크를 LLM에 넘길 하나의 문자열로 조립한다.
 
-    출처 표기에 조문 번호를 포함시켜, LLM이 답변에서 그대로 인용할 수 있게 한다.
-        [근거 1 · 자원순환법 제15조]
+    가이드와 법령을 나눠서 넘긴다. 그래야 LLM이
+    "실천 방법(가이드) + 법적 근거(법령)" 두 층으로 답할 수 있다.
+
+        ### 배출 가이드
+        [[서울시] 분리배출 요령 품목별 분리배출 요령 > 종이류]
+        ...본문...
+
+        ### 관련 법령
+        [자원순환기본법 제15조]
         ...본문...
     """
-    blocks: list[str] = []
+    guides: list[str] = []
+    laws: list[str] = []
 
-    for i, item in enumerate(results, start=1):
-        label = item.get("title", "제목 없음")
-        if item.get("article"):
-            label = f"{label} {item['article']}"
-        blocks.append(f"[근거 {i} · {label}]\n{item['content']}")
+    for item in results:
+        # 청크 본문이 이미 "제8조(…)" 또는 "[품목별 요령 > 종이류]" 로 시작하므로
+        # 여기서는 문서 제목만 붙인다. (라벨을 또 쓰면 중복된다)
+        block = f"[{item.get('title', '제목 없음')}]\n{item['content']}"
+        (laws if item.get("source_type") == "law" else guides).append(block)
 
-    return "\n\n".join(blocks)
+    parts: list[str] = []
+    if guides:
+        parts.append("### 배출 가이드\n" + "\n\n".join(guides))
+    if laws:
+        parts.append("### 관련 법령\n" + "\n\n".join(laws))
+
+    return "\n\n".join(parts)
 
 
 def _clean_title(raw_title: str) -> str:
@@ -187,7 +204,7 @@ def _build_sources(results: list[dict]) -> list[dict]:
     seen: set = set()
 
     for item in results:
-        key = (item.get("document_id"), item.get("article"))
+        key = (item.get("document_id"), item.get("label"))
         if key in seen:
             continue
         seen.add(key)
@@ -238,7 +255,15 @@ def _load_from_db(db=None) -> list[dict]:
                 row.content,
                 row.summary,
             ]
-            parts = [p for p in candidates if isinstance(p, str) and p.strip()]
+            # content 와 content_text 가 같은 값인 경우가 흔하므로 중복을 제거한다.
+            # (제거하지 않으면 같은 내용이 두 번 인덱싱되어 검색 결과가 중복된다)
+            parts: list[str] = []
+            for candidate in candidates:
+                if not (isinstance(candidate, str) and candidate.strip()):
+                    continue
+                if candidate not in parts:
+                    parts.append(candidate)
+
             if not parts:
                 continue
 
