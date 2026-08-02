@@ -16,8 +16,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from app.models import User
+from app.database import get_db
+from app.models import User, ChatLog
 from app.routers.api import get_current_user
 from app.services import rag_service, vector_store_service
 
@@ -29,6 +31,7 @@ router = APIRouter()
 
 class ChatRequest(BaseModel):
     question: str
+    region: str = "seoul"  # seoul | cheonan | busan_namgu
 
 
 class ChatSource(BaseModel):
@@ -38,7 +41,9 @@ class ChatSource(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    answer: str
+    answer: str  # 가이드+법률 통합 답변
+    tip: str     # 실천 팁
+    source: str  # 출처 요약 문자열
     sources: list[ChatSource]
 
 
@@ -51,7 +56,7 @@ class RagSearchRequest(BaseModel):
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(req: ChatRequest, user: User = Depends(get_current_user)):
+def chat(req: ChatRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """문서·법령을 근거로 질문에 답한다. (프론트 챗봇 화면이 호출)
 
     검색 범위: 본인 문서 + 공용 법령(source_type="law")
@@ -61,7 +66,20 @@ def chat(req: ChatRequest, user: User = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="질문을 입력해 주세요.")
 
     try:
-        return rag_service.ask(question, owner_id=user.id)
+        result = rag_service.ask(question, owner_id=user.id, region=req.region)
+
+        # 질문 로그 저장 (통계용)
+        has_answer = bool(result.get("answer")) and "찾을 수 없습니다" not in result.get("answer", "")
+        log = ChatLog(
+            user_id=user.id,
+            question=question,
+            region=req.region,
+            has_answer=has_answer,
+        )
+        db.add(log)
+        db.commit()
+
+        return result
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"답변 생성에 실패했습니다: {exc}")
 

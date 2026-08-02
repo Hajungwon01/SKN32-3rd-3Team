@@ -48,3 +48,17 @@ class Document(Base):
         backref=backref("parent", remote_side=[id]),
         cascade="all, delete-orphan",
     )
+
+
+class ChatLog(Base):
+    """챗봇 질문 로그. 관리자 대시보드 통계용."""
+    __tablename__ = "chat_logs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    question = Column(Text, nullable=False)
+    region = Column(String(50), nullable=False, default="seoul")
+    has_answer = Column(Boolean, default=True)  # 근거 기반 답변 성공 여부
+    created_at = Column(DateTime, server_default=func.now(), index=True)
+
+    user = relationship("User")

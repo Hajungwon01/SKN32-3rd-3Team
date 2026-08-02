@@ -8,8 +8,120 @@
 </head>
 <body>
 
+  <!-- ===== 랜딩 페이지 ===== -->
+  <div id="landing-page" class="page active">
+    <div class="landing">
+      <!-- 네비게이션 -->
+      <nav class="land-nav">
+        <div class="land-nav-left">
+          <span class="land-logo-icon">🌿</span>
+          <strong class="land-logo-text">Ecobot</strong>
+        </div>
+        <div class="land-nav-right">
+          <button class="btn btn-outline btn-sm" onclick="showPage('login-page')">로그인</button>
+          <button class="btn btn-primary btn-sm" onclick="goToStart()">시작하기</button>
+        </div>
+      </nav>
+
+      <!-- 히어로 -->
+      <section class="land-hero">
+        <h1>우리 동네 <span class="land-accent">환경 실천</span>,<br>AI가 알려드려요</h1>
+        <p>환경부 공식 가이드와 지역별 조례를 기반으로<br>분리배출 · 음식물쓰레기 · 에너지 절약을 안내합니다</p>
+        <div class="land-hero-btns">
+          <button class="btn btn-primary btn-lg" onclick="goToStart()">시작하기</button>
+          <button class="btn btn-outline btn-lg" onclick="showPage('service-page')">서비스 안내</button>
+        </div>
+      </section>
+
+      <!-- 공지 안내 바 -->
+      <div class="land-notice">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span>환경부 가이드라인 및 관련 법령을 기반으로 답변합니다. 법적 효력이 있는 공식 답변이 아님을 유의해 주세요.</span>
+      </div>
+
+      <!-- 기능 카드 -->
+      <section class="land-features" id="land-features">
+        <div class="land-feat" onclick="openGuide('recycling')">
+          <div class="land-feat-icon" style="background:#E8F5EE">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 4.875 5.5l4.876-2.346"/><path d="m14.5 9 3-3-3-3"/></svg>
+          </div>
+          <h3>분리배출 안내</h3>
+          <p>품목별 분리수거 방법을<br>지역 기준으로 정확하게</p>
+        </div>
+        <div class="land-feat" onclick="openGuide('food-waste')">
+          <div class="land-feat-icon" style="background:#FFF8E1">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D4890B" stroke-width="2"><path d="M7 21h10"/><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/><path d="M11.38 12a2.4 2.4 0 0 1-.4-4.77 2.4 2.4 0 0 1 3.2-2.77 2.4 2.4 0 0 1 3.47-.63 2.4 2.4 0 0 1 3.36 1.35 2.4 2.4 0 0 1-1.67 3.83"/></svg>
+          </div>
+          <h3>음식물쓰레기</h3>
+          <p>배출 기준, 감량 방법,<br>수수료 안내까지</p>
+        </div>
+        <div class="land-feat" onclick="openGuide('energy')">
+          <div class="land-feat-icon" style="background:#E8F0FB">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3B7DD8" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          </div>
+          <h3>에너지 절약</h3>
+          <p>전기·가스 절약 실천법과<br>지원 제도 안내</p>
+        </div>
+      </section>
+
+      <!-- 하단 2컬럼: 지역 + 서비스 안내 -->
+      <section class="land-bottom">
+        <div class="land-card" id="land-regions">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            지원 지역
+          </h3>
+          <div class="land-regions">
+            <div class="land-region" onclick="openGuide('region-seoul')">
+              <span><span class="land-rdot" style="background:#2D8B4E"></span>서울특별시</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
+            <div class="land-region" onclick="openGuide('region-cheonan')">
+              <span><span class="land-rdot" style="background:#3B7DD8"></span>천안시</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
+            <div class="land-region" onclick="openGuide('region-busan')">
+              <span><span class="land-rdot" style="background:#D4890B"></span>부산 남구</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
+          </div>
+        </div>
+        <div class="land-card" id="land-info">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            서비스 안내
+          </h3>
+          <div class="land-info-list">
+            <div class="land-info-row">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <div><strong>24시간 운영</strong><span>언제든 환경 실천 관련 질문 가능</span></div>
+            </div>
+            <div class="land-info-row">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+              <div><strong>환경부 공식 데이터</strong><span>가이드라인 및 관련 법령 기반 답변</span></div>
+            </div>
+            <div class="land-info-row">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              <div><strong>지역 맞춤 안내</strong><span>지자체별 조례와 규정 반영</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 푸터 -->
+      <footer class="land-footer">
+        <span>© 2025 Ecobot · 생활환경 실천 안내 서비스</span>
+        <div class="land-footer-links">
+          <a href="#" onclick="event.preventDefault()">이용약관</a>
+          <a href="#" onclick="event.preventDefault()">개인정보처리방침</a>
+          <a href="#" onclick="event.preventDefault()">문의하기</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+
   <!-- ===== 로그인 화면 ===== -->
-  <div id="login-page" class="page active">
+  <div id="login-page" class="page">
     <div class="login-container">
       <div class="login-card">
         <div class="login-logo">
@@ -30,6 +142,7 @@
         </form>
         <div class="login-divider"><span>또는</span></div>
         <button class="btn btn-outline btn-full" onclick="showPage('signup-page')">회원가입</button>
+        <p class="login-link"><a href="#" onclick="showPage('landing-page')">← 홈으로 돌아가기</a></p>
       </div>
     </div>
   </div>
@@ -63,6 +176,7 @@
           <button type="submit" class="btn btn-primary btn-full">가입하기</button>
         </form>
         <p class="login-link">이미 계정이 있으신가요? <a href="#" onclick="showPage('login-page')">로그인</a></p>
+        <p class="login-link"><a href="#" onclick="showPage('landing-page')">← 홈으로 돌아가기</a></p>
       </div>
     </div>
   </div>
@@ -73,7 +187,7 @@
       <!-- 사이드바 -->
       <aside class="sidebar">
         <div class="sidebar-header">
-          <div class="sidebar-logo">
+          <div class="sidebar-logo" onclick="showPage('landing-page')" style="cursor:pointer" title="홈으로">
             <span class="logo-icon-sm">🌿</span>
             <span class="logo-text">Ecobot</span>
           </div>
@@ -162,178 +276,192 @@
           <h2>Ecobot 관리자</h2>
         </div>
         <div class="admin-tabs">
-          <button class="admin-tab active" data-tab="stats" onclick="switchAdminTab('stats')">통계</button>
+          <button class="admin-tab active" data-tab="stats" onclick="switchAdminTab('stats')">질문 통계</button>
           <button class="admin-tab" data-tab="documents" onclick="switchAdminTab('documents')">문서 관리</button>
-          <button class="admin-tab" data-tab="users" onclick="switchAdminTab('users')">사용자</button>
         </div>
       </header>
 
-      <!-- 통계 탭 -->
+      <!-- 질문 통계 탭 -->
       <div class="admin-content" id="tab-stats">
-        <div class="stats-grid">
-          <div class="stat-card">
-            <p class="stat-label">총 질문 수</p>
-            <p class="stat-value green">1,247</p>
-            <p class="stat-change up">+12% 이번 주</p>
-          </div>
-          <div class="stat-card">
-            <p class="stat-label">등록 문서</p>
-            <p class="stat-value blue">86</p>
-            <p class="stat-change">내부 54 / 외부 32</p>
-          </div>
-          <div class="stat-card">
-            <p class="stat-label">활성 사용자</p>
-            <p class="stat-value amber">34</p>
-            <p class="stat-change up">+5 이번 주</p>
-          </div>
-          <div class="stat-card">
-            <p class="stat-label">평균 응답 시간</p>
-            <p class="stat-value">2.3초</p>
-            <p class="stat-change">목표: 3초 이내</p>
-          </div>
+        <div class="stats-grid" id="stats-cards">
+          <div class="stat-card"><p class="stat-label">총 질문 수</p><p class="stat-value green" id="stat-total">-</p><p class="stat-change" id="stat-week-change"></p></div>
+          <div class="stat-card"><p class="stat-label">오늘 질문</p><p class="stat-value" id="stat-today">-</p><p class="stat-change" id="stat-today-diff"></p></div>
+          <div class="stat-card"><p class="stat-label">활성 사용자</p><p class="stat-value amber" id="stat-users">-</p><p class="stat-change">이번 주</p></div>
+          <div class="stat-card"><p class="stat-label">답변 성공률</p><p class="stat-value green" id="stat-success">-</p><p class="stat-change">근거 기반</p></div>
         </div>
 
-        <div class="stats-section">
-          <h3>지역별 질문 분포</h3>
-          <div class="region-stats">
-            <div class="region-bar">
-              <span class="region-bar-label">서울</span>
-              <div class="region-bar-track"><div class="region-bar-fill" style="width: 52%; background: var(--color-green);"></div></div>
-              <span class="region-bar-value">648</span>
+        <div class="stats-columns">
+          <!-- 지역별 질문 분포 -->
+          <div class="stats-section">
+            <h3>지역별 질문 분포</h3>
+            <div class="region-stats" id="region-stats-container">
+              <p class="stat-placeholder">데이터 로딩 중...</p>
             </div>
-            <div class="region-bar">
-              <span class="region-bar-label">천안</span>
-              <div class="region-bar-track"><div class="region-bar-fill" style="width: 28%; background: var(--color-blue);"></div></div>
-              <span class="region-bar-value">349</span>
-            </div>
-            <div class="region-bar">
-              <span class="region-bar-label">부산 남구</span>
-              <div class="region-bar-track"><div class="region-bar-fill" style="width: 20%; background: var(--color-amber);"></div></div>
-              <span class="region-bar-value">250</span>
+          </div>
+
+          <!-- 인기 질문 TOP 5 -->
+          <div class="stats-section">
+            <h3>인기 질문 TOP 5</h3>
+            <div id="top-questions-container">
+              <p class="stat-placeholder">데이터 로딩 중...</p>
             </div>
           </div>
         </div>
 
+        <!-- 일별 추이 -->
         <div class="stats-section">
-          <h3>카테고리별 질문 TOP 5</h3>
-          <table class="admin-table">
-            <thead>
-              <tr><th>순위</th><th>카테고리</th><th>질문 수</th><th>비율</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>1</td><td>분리수거</td><td>412</td><td>33%</td></tr>
-              <tr><td>2</td><td>음식물쓰레기</td><td>298</td><td>24%</td></tr>
-              <tr><td>3</td><td>재활용 품목</td><td>215</td><td>17%</td></tr>
-              <tr><td>4</td><td>에너지 절약</td><td>187</td><td>15%</td></tr>
-              <tr><td>5</td><td>환경 정책</td><td>135</td><td>11%</td></tr>
-            </tbody>
-          </table>
+          <h3>최근 7일 질문 추이</h3>
+          <div class="daily-chart" id="daily-chart-container">
+            <p class="stat-placeholder">데이터 로딩 중...</p>
+          </div>
         </div>
       </div>
 
       <!-- 문서 관리 탭 -->
       <div class="admin-content hidden" id="tab-documents">
         <div class="doc-toolbar">
-          <div class="doc-filters">
-            <select class="filter-select">
-              <option value="all">전체 유형</option>
-              <option value="env_guide">환경 가이드</option>
-              <option value="law">법령</option>
-              <option value="policy">정책</option>
-            </select>
-            <select class="filter-select">
-              <option value="all">전체 지역</option>
-              <option value="seoul">서울</option>
-              <option value="cheonan">천안</option>
-              <option value="busan-namgu">부산 남구</option>
-              <option value="common">공통</option>
-            </select>
+          <div class="index-status" id="index-status">
+            <span class="index-dot"></span>
+            <span>인덱스 상태 확인 중...</span>
           </div>
-          <button class="btn btn-primary btn-sm">+ 문서 추가</button>
+          <button class="btn btn-sm" onclick="rebuildIndex()">🔄 인덱스 재빌드</button>
         </div>
-        <table class="admin-table">
+        <table class="admin-table" id="doc-table">
           <thead>
-            <tr><th>문서 제목</th><th>유형</th><th>지역</th><th>벡터화</th><th>수정일</th><th>관리</th></tr>
+            <tr><th>문서명</th><th>유형</th><th>지역</th><th>청크</th></tr>
           </thead>
-          <tbody>
-            <tr>
-              <td>서울시 분리배출 가이드 2026</td>
-              <td><span class="type-badge guide">환경 가이드</span></td>
-              <td><span class="region-tag seoul">서울</span></td>
-              <td><span class="vector-status done">완료</span></td>
-              <td>2026-07-28</td>
-              <td><button class="btn-text-sm">수정</button> <button class="btn-text-sm danger">삭제</button></td>
-            </tr>
-            <tr>
-              <td>천안시 재활용품 분류 기준</td>
-              <td><span class="type-badge guide">환경 가이드</span></td>
-              <td><span class="region-tag cheonan">천안</span></td>
-              <td><span class="vector-status done">완료</span></td>
-              <td>2026-07-26</td>
-              <td><button class="btn-text-sm">수정</button> <button class="btn-text-sm danger">삭제</button></td>
-            </tr>
-            <tr>
-              <td>부산 남구 음식물쓰레기 배출 안내</td>
-              <td><span class="type-badge guide">환경 가이드</span></td>
-              <td><span class="region-tag busan">부산 남구</span></td>
-              <td><span class="vector-status done">완료</span></td>
-              <td>2026-07-25</td>
-              <td><button class="btn-text-sm">수정</button> <button class="btn-text-sm danger">삭제</button></td>
-            </tr>
-            <tr>
-              <td>자원순환법 시행령</td>
-              <td><span class="type-badge law">법령</span></td>
-              <td><span class="region-tag common">공통</span></td>
-              <td><span class="vector-status done">완료</span></td>
-              <td>2026-07-20</td>
-              <td><button class="btn-text-sm">수정</button> <button class="btn-text-sm danger">삭제</button></td>
-            </tr>
-            <tr>
-              <td>환경영향평가법</td>
-              <td><span class="type-badge law">법령</span></td>
-              <td><span class="region-tag common">공통</span></td>
-              <td><span class="vector-status pending">대기</span></td>
-              <td>2026-07-18</td>
-              <td><button class="btn-text-sm">수정</button> <button class="btn-text-sm danger">삭제</button></td>
-            </tr>
-            <tr>
-              <td>일회용품 사용 규제 안내</td>
-              <td><span class="type-badge policy">정책</span></td>
-              <td><span class="region-tag common">공통</span></td>
-              <td><span class="vector-status done">완료</span></td>
-              <td>2026-07-15</td>
-              <td><button class="btn-text-sm">수정</button> <button class="btn-text-sm danger">삭제</button></td>
-            </tr>
+          <tbody id="doc-table-body">
+            <tr><td colspan="4" class="stat-placeholder">데이터 로딩 중...</td></tr>
           </tbody>
         </table>
-      </div>
 
-      <!-- 사용자 탭 -->
-      <div class="admin-content hidden" id="tab-users">
-        <table class="admin-table">
-          <thead>
-            <tr><th>이름</th><th>이메일</th><th>가입일</th><th>질문 수</th><th>상태</th></tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>김환경</td><td>eco.kim@email.com</td><td>2026-07-01</td><td>87</td>
-              <td><span class="status-active">활성</span></td>
-            </tr>
-            <tr>
-              <td>박분리</td><td>bunri.park@email.com</td><td>2026-07-05</td><td>62</td>
-              <td><span class="status-active">활성</span></td>
-            </tr>
-            <tr>
-              <td>이재활</td><td>recycle.lee@email.com</td><td>2026-07-10</td><td>45</td>
-              <td><span class="status-active">활성</span></td>
-            </tr>
-            <tr>
-              <td>최그린</td><td>green.choi@email.com</td><td>2026-07-15</td><td>23</td>
-              <td><span class="status-inactive">비활성</span></td>
-            </tr>
-          </tbody>
-        </table>
+        <!-- 새 문서 업로드 -->
+        <div class="upload-section">
+          <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+            <div class="upload-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <p class="upload-text">새 문서 업로드 (.txt, .md, .pdf)</p>
+            <p class="upload-hint">클릭하거나 파일을 드래그하세요</p>
+          </div>
+          <input type="file" id="file-input" accept=".txt,.md,.pdf" style="display:none" onchange="handleFileUpload(this)">
+          <div class="upload-progress hidden" id="upload-progress">
+            <div class="upload-progress-bar" id="upload-progress-bar"></div>
+            <span class="upload-progress-text" id="upload-progress-text">업로드 중...</span>
+          </div>
+        </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== 가이드 안내 페이지 ===== -->
+  <div id="guide-page" class="page">
+    <div class="guide-layout">
+      <nav class="land-nav">
+        <div class="land-nav-left" onclick="showPage('landing-page')" style="cursor:pointer">
+          <span class="land-logo-icon">🌿</span>
+          <strong class="land-logo-text">Ecobot</strong>
+        </div>
+        <div class="land-nav-right">
+          <button class="btn btn-outline btn-sm" onclick="showPage('landing-page')">← 홈으로</button>
+          <button class="btn btn-primary btn-sm" onclick="goToStart()">챗봇 상담</button>
+        </div>
+      </nav>
+      <div class="guide-content" id="guide-content">
+        <!-- JS로 렌더링 -->
+      </div>
+      <footer class="land-footer">
+        <span>© 2025 Ecobot · 생활환경 실천 안내 서비스</span>
+        <div class="land-footer-links">
+          <a href="#" onclick="event.preventDefault()">이용약관</a>
+          <a href="#" onclick="event.preventDefault()">개인정보처리방침</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ===== 서비스 소개 페이지 ===== -->
+  <div id="service-page" class="page">
+    <div class="guide-layout">
+      <nav class="land-nav">
+        <div class="land-nav-left" onclick="showPage('landing-page')" style="cursor:pointer">
+          <span class="land-logo-icon">🌿</span>
+          <strong class="land-logo-text">Ecobot</strong>
+        </div>
+        <div class="land-nav-right">
+          <button class="btn btn-outline btn-sm" onclick="showPage('landing-page')">← 홈으로</button>
+          <button class="btn btn-primary btn-sm" onclick="goToStart()">시작하기</button>
+        </div>
+      </nav>
+      <div class="guide-content">
+        <div class="service-hero">
+          <h1>Ecobot 서비스 소개</h1>
+          <p>AI 기반 생활환경 실천 안내 서비스</p>
+        </div>
+
+        <div class="service-section">
+          <h2>Ecobot이란?</h2>
+          <p>Ecobot은 환경부 공식 가이드라인과 지역별 조례를 기반으로, 분리배출·음식물쓰레기·에너지 절약에 대한 정확한 정보를 AI 챗봇으로 제공하는 서비스입니다.</p>
+        </div>
+
+        <div class="service-features">
+          <div class="service-feat-card">
+            <div class="service-feat-num">01</div>
+            <h3>지역 맞춤 안내</h3>
+            <p>서울, 천안, 부산 남구 등 지역별로 다른 분리배출 기준과 수거 일정을 정확하게 안내합니다.</p>
+          </div>
+          <div class="service-feat-card">
+            <div class="service-feat-num">02</div>
+            <h3>AI 챗봇 상담</h3>
+            <p>궁금한 점을 자연어로 질문하면, RAG 기술을 활용하여 관련 문서에서 근거 기반 답변을 제공합니다.</p>
+          </div>
+          <div class="service-feat-card">
+            <div class="service-feat-num">03</div>
+            <h3>공식 데이터 기반</h3>
+            <p>환경부 재활용품 분리배출 가이드라인, 폐기물관리법 등 공식 자료를 기반으로 신뢰할 수 있는 정보를 제공합니다.</p>
+          </div>
+        </div>
+
+        <div class="service-section">
+          <h2>지원 분야</h2>
+          <div class="service-topics">
+            <div class="service-topic">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 4.875 5.5l4.876-2.346"/><path d="m14.5 9 3-3-3-3"/></svg>
+              <div>
+                <strong>분리배출 안내</strong>
+                <span>품목별 분리수거 방법, 재활용 가능 여부 판단</span>
+              </div>
+            </div>
+            <div class="service-topic">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4890B" stroke-width="2"><path d="M7 21h10"/><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/></svg>
+              <div>
+                <strong>음식물쓰레기</strong>
+                <span>배출 기준, 감량 방법, 수수료 안내</span>
+              </div>
+            </div>
+            <div class="service-topic">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3B7DD8" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              <div>
+                <strong>에너지 절약</strong>
+                <span>전기·가스 절약 실천법, 지원 제도</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="service-cta">
+          <h2>지금 바로 시작하세요</h2>
+          <p>회원가입 후 AI 챗봇에게 환경 실천에 관한 질문을 해보세요.</p>
+          <button class="btn btn-primary btn-lg" onclick="goToStart()">시작하기</button>
+        </div>
+      </div>
+      <footer class="land-footer">
+        <span>© 2025 Ecobot · 생활환경 실천 안내 서비스</span>
+        <div class="land-footer-links">
+          <a href="#" onclick="event.preventDefault()">이용약관</a>
+          <a href="#" onclick="event.preventDefault()">개인정보처리방침</a>
+        </div>
+      </footer>
     </div>
   </div>
 

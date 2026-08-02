@@ -209,6 +209,7 @@ def build_chunks(documents: list[dict]) -> list[dict]:
                     "owner_id": doc.get("owner_id"),
                     "title": doc.get("title", "제목 없음"),
                     "source_type": source_type,
+                    "region": doc.get("region", "common"),
                     "chunk_index": chunk_index,
                     # 법령이면 "제15조", 가이드면 "품목별 분리배출 요령 > 종이류"
                     "label": piece["label"],
