@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # (개발 단계 전용) MySQL 연결 전 문서를 읽어올 임시 폴더
     DOCS_DIR: Path = BASE_DIR / "data" / "docs"
 
+    # 내부 가이드 문서 폴더 (분리배출 가이드 등)
+    GUIDE_DIR: Path = BASE_DIR / "data" / "guide"
+
     # 법령 원문 txt 폴더 (시드 적재 스크립트가 읽는 곳)
     LAWS_DIR: Path = BASE_DIR / "data" / "laws"
 

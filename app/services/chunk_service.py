@@ -127,6 +127,7 @@ def build_chunks(documents: list[dict]) -> list[dict]:
                     "owner_id": doc.get("owner_id"),
                     "title": doc.get("title", "제목 없음"),
                     "source_type": source_type,
+                    "region": doc.get("region", "common"),
                     "chunk_index": chunk_index,
                     "article": (
                         extract_article_label(piece) if source_type == "law" else None

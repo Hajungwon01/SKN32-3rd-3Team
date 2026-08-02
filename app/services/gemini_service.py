@@ -51,48 +51,66 @@ def generate_summary(prompt: str) -> str:
 
 # ─────────────────── RAG 답변 (RAG 파트) ───────────────────
 
-ANSWER_PROMPT = """당신은 환경·분리배출 관련 법령을 안내하는 상담 도우미입니다.
-아래 [근거]에 제시된 조문 내용만 사용해서 한국어로 답변하세요.
+ANSWER_PROMPT = """당신은 환경·분리배출 관련 상담 도우미 'Ecobot' 입니다.
+아래 [근거]에 제시된 문서 내용만 사용해서 한국어로 답변하세요.
+
+반드시 아래 2개 섹션으로 나누어 답변하세요. 각 섹션은 정확히 해당 태그로 감싸세요.
+
+<answer>가이드 문서와 법령 근거를 종합하여 질문에 대한 답변을 3~5문장으로 작성합니다. 가이드 내용(분리배출 방법, 지역 규정 등)과 법령 근거(법령명·조문 번호)가 있으면 자연스럽게 함께 서술하세요.</answer>
+<tip>시민이 바로 실천할 수 있는 생활 팁을 1~2문장으로 알려줍니다.</tip>
 
 작성 규칙
 1. 근거에 없는 내용은 절대 추측하거나 지어내지 마세요.
-2. 답변에는 반드시 근거가 된 법령명과 조문 번호를 "○○법 제N조" 형태로 밝히세요.
-3. 근거만으로 답할 수 없으면 "관련 조문을 찾을 수 없습니다"라고만 답하세요.
-4. 3~5문장으로 간결하게, 실제 행동으로 옮길 수 있게 설명하세요.
+2. 근거만으로 답할 수 없으면 "관련 정보를 찾을 수 없습니다."라고만 적으세요.
+3. 태그 바깥에는 아무 텍스트도 쓰지 마세요.
 
---- 예시 1 ---
+--- 예시 ---
 [근거]
-[근거 1 · 자원순환기본법 제3조]
-제3조(정의) 이 법에서 "순환자원"이란 폐기물 중 환경적·경제적 가치가 있어 재사용·재생이용할 수 있는 것을 말한다.
+[근거 1 · [가이드]_환경부_공통_분리배출_기준]
+페트병은 내용물을 비우고 라벨을 제거한 뒤 찌그러뜨려서 뚜껑을 닫아 배출합니다.
 
-[질문] 순환자원이 무엇인가요?
-[답변] 자원순환기본법 제3조에 따르면 순환자원이란 폐기물 중 환경적·경제적 가치가 있어 재사용하거나 재생이용할 수 있는 것을 뜻합니다. 즉 버려지는 물건이라도 다시 쓸 수 있으면 순환자원으로 분류됩니다.
-
---- 예시 2 ---
-[근거]
-[근거 1 · 폐기물관리법 제8조]
-제8조(폐기물의 투기 금지) 누구든지 지정된 장소가 아닌 곳에 폐기물을 버려서는 아니 된다.
-
-[질문] 전기차 배터리는 어떻게 폐기하나요?
-[답변] 관련 조문을 찾을 수 없습니다.
+[질문] 페트병 라벨 꼭 떼야 해?
+<answer>네, 페트병 라벨은 반드시 제거해야 합니다. 환경부 분리배출 기준에 따르면 내용물을 비우고 라벨을 떼어낸 뒤, 찌그러뜨려서 뚜껑을 닫아 배출해야 합니다.</answer>
+<tip>라벨 절취선이 있으면 쉽게 뗄 수 있어요. 절취선이 없으면 가위로 한 번만 자르면 쉽게 벗겨집니다.</tip>
 
 --- 실제 질문 ---
 [근거]
 {context}
 
 [질문] {question}
-[답변]"""
+"""
 
 
-def answer_with_context(question: str, context: str) -> str:
-    """검색된 조문만 근거로 질문에 답한다. (rag_service 가 호출)"""
+import re
+
+_SECTION_RE = re.compile(r"<(answer|tip)>(.*?)</\1>", re.DOTALL)
+
+
+def _parse_sections(text: str) -> dict:
+    """LLM 응답에서 <answer>, <tip> 섹션을 추출한다."""
+    sections = {"answer": "", "tip": ""}
+    for match in _SECTION_RE.finditer(text):
+        sections[match.group(1)] = match.group(2).strip()
+    return sections
+
+
+def answer_with_context(question: str, context: str) -> dict:
+    """검색된 문서를 근거로 2섹션 답변을 생성한다. (rag_service 가 호출)
+
+    반환: {"answer": str, "tip": str}
+    """
     result = _generate(ANSWER_PROMPT.format(context=context, question=question))
 
-    # LLM 을 쓸 수 없으면 검색 결과라도 보여준다 (서버가 죽지 않게)
     if result is None:
-        return (
-            "[LLM 미연결 · 검색된 조문 원문]\n"
-            "GEMINI_API_KEY 설정 후 다시 질문하면 요약된 답변을 받을 수 있습니다.\n\n"
-            f"{context}"
-        )
-    return result
+        return {
+            "answer": "[LLM 미연결] GEMINI_API_KEY 설정 후 다시 질문하세요.",
+            "tip": "",
+        }
+
+    sections = _parse_sections(result)
+
+    # 파싱 실패 시 전체 응답을 answer 에 넣는다
+    if not any(sections.values()):
+        sections["answer"] = result
+
+    return sections

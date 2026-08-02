@@ -74,10 +74,12 @@ def search(
     top_k: int | None = None,
     owner_id: int | None = None,
     min_score: float | None = None,
+    region: str | None = None,
 ) -> list[dict]:
     """질문과 유사한 청크를 점수 순으로 반환한다.
 
     owner_id 를 넘기면 "본인 문서 + 공용 법령"만 남긴다.
+    region 을 넘기면 "해당 지역 + common(공통)" 문서만 남긴다.
     min_score 미만인 결과는 근거로 삼기에 부족하다고 보고 제외한다.
     """
     top_k = top_k or settings.RAG_TOP_K
@@ -86,7 +88,7 @@ def search(
     query_vector = embedding_service.embed_query(query)
 
     # 필터링 후에도 top_k 개를 채우기 위해 넉넉히 검색한 뒤 잘라낸다.
-    fetch_k = top_k * 5 if owner_id is not None else top_k * 2
+    fetch_k = top_k * 5 if (owner_id is not None or region) else top_k * 2
     results = vector_store_service.search(query_vector, fetch_k)
 
     if owner_id is not None:
@@ -94,6 +96,13 @@ def search(
             r for r in results
             if r.get("owner_id") == owner_id
             or r.get("source_type") in PUBLIC_SOURCE_TYPES
+        ]
+
+    # 지역 필터: 해당 지역 + common(공통) 문서만 남긴다
+    if region:
+        results = [
+            r for r in results
+            if r.get("region") in (region, "common")
         ]
 
     # 유사도 임계값 (환각 방지 1차 장치)
@@ -106,28 +115,33 @@ def ask(
     question: str,
     top_k: int | None = None,
     owner_id: int | None = None,
+    region: str | None = None,
 ) -> dict:
-    """검색된 문맥을 근거로 답변을 생성한다.
+    """검색된 문맥을 근거로 3섹션 답변을 생성한다.
 
-    반환 형식은 프론트 types/api.ts 의 ChatResponse 와 동일하다.
-        {"answer": str,
+    반환 형식:
+        {"guide": str, "law": str, "tip": str, "source": str,
          "sources": [{"document_id": int, "title": str, "snippet": str}, ...]}
     """
-    results = search(question, top_k, owner_id)
+    results = search(question, top_k, owner_id, region=region)
 
     # 근거가 없으면 LLM을 호출하지 않는다. (환각 방지)
     if not results:
         return {
-            "answer": (
-                "관련 조문을 찾을 수 없습니다. "
-                "질문을 조금 더 구체적으로 바꾸거나, 관련 법령이 등록되어 있는지 확인해 주세요."
-            ),
+            "answer": "관련 문서를 찾을 수 없습니다. 질문을 조금 더 구체적으로 바꿔 보세요.",
+            "tip": "",
+            "source": "",
             "sources": [],
         }
 
+    sections = _generate_answer(question, _build_context(results))
+    source_list = _build_sources(results)
+
     return {
-        "answer": _generate_answer(question, _build_context(results)),
-        "sources": _build_sources(results),
+        "answer": sections.get("answer", ""),
+        "tip": sections.get("tip", ""),
+        "source": ", ".join(s["title"] for s in source_list),
+        "sources": source_list,
     }
 
 
@@ -152,6 +166,18 @@ def _build_context(results: list[dict]) -> str:
     return "\n\n".join(blocks)
 
 
+def _clean_title(raw_title: str) -> str:
+    """파일명 형태의 제목을 사람이 읽기 좋은 형태로 정리한다.
+
+    예) [가이드]_환경부_공통_분리배출_기준 → 환경부 공통 분리배출 기준
+        [법령]_자원순환법 → 자원순환법
+    """
+    import re
+    title = re.sub(r"^\[.*?\]_?", "", raw_title)  # [가이드]_ 등 접두사 제거
+    title = title.replace("_", " ")                # 언더스코어 → 공백
+    return title.strip() or raw_title
+
+
 def _build_sources(results: list[dict]) -> list[dict]:
     """검색 결과를 프론트 ChatSource 형식으로 변환한다.
 
@@ -173,7 +199,7 @@ def _build_sources(results: list[dict]) -> list[dict]:
         sources.append(
             {
                 "document_id": item.get("document_id"),
-                "title": item.get("title", "제목 없음"),
+                "title": _clean_title(item.get("title", "제목 없음")),
                 "snippet": snippet,
             }
         )
@@ -240,36 +266,76 @@ def _load_from_db(db=None) -> list[dict]:
             session.close()
 
 
+def _extract_region(filename: str) -> str:
+    """파일명에서 지역 코드를 추출한다.
+
+    예) [가이드]_서울시_... → seoul
+        [가이드]_천안시_... → cheonan
+        [가이드]_부산남구_... → busan_namgu
+        [가이드]_환경부_공통_... → common
+    """
+    REGION_MAP = {
+        "서울": "seoul",
+        "천안": "cheonan",
+        "부산남구": "busan_namgu",
+        "부산": "busan_namgu",
+        "공통": "common",
+        "환경부": "common",
+    }
+    for keyword, code in REGION_MAP.items():
+        if keyword in filename:
+            return code
+    return "common"
+
+
 def _load_from_files() -> list[dict]:
-    """data/docs 폴더에서 문서를 읽는다. (RAG_SOURCE=files, DB 없이 테스트용)
+    """data/guide + data/docs 폴더에서 문서를 읽는다. (RAG_SOURCE=files, DB 없이 테스트용)
 
     파일명이 '[법령]' 으로 시작하면 법령으로 간주해 조문 단위로 청킹한다.
+    파일명이 '[가이드]' 로 시작하면 guide 유형으로, 지역명을 추출해 region을 설정한다.
     """
-    settings.DOCS_DIR.mkdir(parents=True, exist_ok=True)
     supported = {".txt", ".md", ".pdf"}
-
     documents: list[dict] = []
-    for i, path in enumerate(sorted(settings.DOCS_DIR.iterdir()), start=1):
-        if not (path.is_file() and path.suffix.lower() in supported):
-            continue
 
-        text = _read_file(path)
-        if not text.strip():
-            print(f"[RAG] 텍스트를 추출하지 못했습니다: {path.name} (스캔 PDF면 OCR 필요)")
-            continue
+    # data/guide 와 data/docs 두 폴더를 모두 탐색
+    search_dirs = [settings.GUIDE_DIR, settings.DOCS_DIR]
 
-        documents.append(
-            {
-                "id": i,           # 임시 id (파일 모드 전용)
-                "owner_id": None,
-                "title": path.stem,
-                "content": text,
-                "source_type": "law" if path.stem.startswith("[법령]") else "manual",
-            }
-        )
+    doc_id = 0
+    for folder in search_dirs:
+        folder.mkdir(parents=True, exist_ok=True)
+        for path in sorted(folder.iterdir()):
+            if not (path.is_file() and path.suffix.lower() in supported):
+                continue
+
+            text = _read_file(path)
+            if not text.strip():
+                print(f"[RAG] 텍스트를 추출하지 못했습니다: {path.name} (스캔 PDF면 OCR 필요)")
+                continue
+
+            doc_id += 1
+            stem = path.stem
+
+            # source_type 결정
+            if stem.startswith("[법령]"):
+                source_type = "law"
+            elif stem.startswith("[가이드]"):
+                source_type = "guide"
+            else:
+                source_type = "manual"
+
+            documents.append(
+                {
+                    "id": doc_id,
+                    "owner_id": None,
+                    "title": stem,
+                    "content": text,
+                    "source_type": source_type,
+                    "region": _extract_region(stem),
+                }
+            )
 
     if not documents:
-        print(f"[RAG] 문서를 찾지 못했습니다. 경로: {settings.DOCS_DIR}")
+        print(f"[RAG] 문서를 찾지 못했습니다. 경로: {search_dirs}")
         print(f"      지원 형식: {', '.join(sorted(supported))}")
 
     return documents
@@ -295,11 +361,13 @@ def _read_file(path: Path) -> str:
 # ─────────────────── 답변 생성 ───────────────────
 
 
-def _generate_answer(question: str, context: str) -> str:
-    """컨텍스트를 근거로 답변을 생성한다.
+def _generate_answer(question: str, context: str) -> dict:
+    """컨텍스트를 근거로 3섹션 답변을 생성한다.
 
     gemini_service.answer_with_context() 가 있으면 사용하고,
     없으면 검색된 원문을 그대로 보여주는 대체 답변을 반환한다.
+
+    반환: {"guide": str, "law": str, "tip": str}
     """
     try:
         from app.services import gemini_service
@@ -309,4 +377,7 @@ def _generate_answer(question: str, context: str) -> str:
     except ImportError:
         pass
 
-    return f"[LLM 미연결 상태 · 검색 결과 원문]\n{context}"
+    return {
+        "answer": f"[LLM 미연결 상태 · 검색 결과 원문]\n{context}",
+        "tip": "",
+    }

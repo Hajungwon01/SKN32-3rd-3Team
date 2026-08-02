@@ -15,6 +15,7 @@ from app.database import Base, engine
 from app import models  # noqa: F401
 from app.routers.api import router as api_router
 from app.routers import rag
+from app.routers import admin
 
 BASE = Path(__file__).resolve().parent
 
@@ -38,6 +39,7 @@ def health():
 
 # app.include_router(api, prefix="/api")
 app.include_router(rag.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
 # ─── 정적 파일 ───────────────────────────────────────────────────────
 # html=True 는 "/" 요청에 index.html 을 돌려준다.
