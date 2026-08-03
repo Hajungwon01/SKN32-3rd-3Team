@@ -109,149 +109,6 @@ function getDefaultResponse(region) {
 function showPage(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(pageId).classList.add('active');
-  if (pageId === 'admin-page') loadAdminDashboard();
-}
-
-// ===== 시작하기 (로그인 상태 분기) =====
-function goToStart() {
-  if (currentUser) {
-    showPage('chat-page');
-  } else {
-    showPage('signup-page');
-  }
-}
-
-// ===== 가이드 페이지 =====
-const GUIDE_DATA = {
-  'recycling': {
-    title: '분리배출 가이드',
-    icon: '#2D8B4E',
-    color: '#E8F5EE',
-    sections: [
-      { heading: '분리배출 기본 원칙', items: ['비운다: 용기 속 내용물을 깨끗이 비운다', '헹군다: 물로 헹구는 등 이물질을 제거한다', '분리한다: 라벨, 뚜껑 등 다른 재질을 분리한다', '섞지 않는다: 재질별로 구분하여 해당 수거함에 배출한다'] },
-      { heading: '종이류', items: ['골판지 상자: 테이프 제거 후 접어서 배출', '종이팩: 내용물 비우고 헹궈 말린 후 전용수거함 배출', '신문지: 반듯하게 펴서 묶어 배출', '비해당: 코팅 종이컵, 영수증, 사진용지 → 종량제봉투'] },
-      { heading: '플라스틱류', items: ['페트병: 내용물 비우고 라벨 제거, 찌그러뜨려 뚜껑 닫고 배출', '투명 페트병: 별도 분리 배출 (라벨 반드시 제거)', '비닐류: 이물질 제거 후 비닐류로 배출', '비해당: 오염된 비닐, 식탁보, 고무장갑 → 종량제봉투'] },
-      { heading: '유리병', items: ['음료·소주병: 헹군 후 분리배출', '빈용기보증금 대상 유리병: 소매점 반납하여 보증금 환급', '비해당: 깨진 유리(신문지 싸서 종량제봉투), 내열유리, 도자기류'] },
-      { heading: '금속캔', items: ['알루미늄캔·철캔: 내용물 비우고 헹궈서 배출', '부탄가스·살충제: 통풍 장소에서 잔여 가스 제거 후 배출', '비해당: 알루미늄 호일(종량제봉투)'] },
-    ]
-  },
-  'food-waste': {
-    title: '음식물쓰레기 배출 가이드',
-    icon: '#D4890B',
-    color: '#FFF8E1',
-    sections: [
-      { heading: '음식물쓰레기 판별 기준', items: ['동물이 먹을 수 있는 것 → 음식물쓰레기', '동물이 먹을 수 없는 것 → 일반쓰레기(종량제봉투)'] },
-      { heading: '음식물쓰레기 해당', items: ['과일 껍질 (수박, 귤, 사과 등)', '채소 자투리, 남은 밥·반찬', '달걀 내용물, 생선살'] },
-      { heading: '일반쓰레기 해당 (주의)', items: ['쪽파·대파 뿌리, 양파 껍질, 옥수수 껍질·속대', '호두·밤·땅콩 등 딱딱한 껍데기', '소·돼지·닭 뼈, 생선 뼈', '조개·굴·전복 등 패류 껍데기', '달걀 껍데기', '한약재 찌꺼기, 티백'] },
-      { heading: '배출 방법', items: ['물기를 최대한 제거한 후 배출', '전용 종량제봉투 또는 RFID 감량기 이용', '지역별 배출 요일·시간 확인'] },
-    ]
-  },
-  'energy': {
-    title: '에너지 절약 가이드',
-    icon: '#3B7DD8',
-    color: '#E8F0FB',
-    sections: [
-      { heading: '전기 절약', items: ['사용하지 않는 콘센트 뽑기 (대기전력 차단)', '에너지효율 1등급 가전제품 사용', '냉장고 적정 용량 유지 (60~70%)', 'LED 조명 사용, 불필요한 조명 끄기', '에어컨 적정 온도: 냉방 26°C, 난방 20°C'] },
-      { heading: '가스 절약', items: ['샤워 시간 줄이기 (1분 줄이면 연 2만원 절약)', '보일러 외출 모드 활용', '겨울철 내복 착용 (체감온도 3°C 상승 효과)', '창문 틈새 단열 강화'] },
-      { heading: '지원 제도', items: ['에너지바우처: 취약계층 냉·난방비 지원', '탄소포인트제: 에너지 절감 실적에 따라 포인트 지급', '한전 에너지캐시백: 전년 동기 대비 절감 시 캐시백', '그린리모델링: 노후 건축물 에너지 성능 개선 지원'] },
-    ]
-  },
-  'region-seoul': {
-    title: '서울특별시 분리배출 가이드',
-    icon: '#2D8B4E',
-    color: '#E8F5EE',
-    sections: [
-      { heading: '서울시 분리배출 특징', items: ['60여 개 품목 표준 배출 기준안 통일', '투명 페트병 별도 분리배출 의무화', '아파트·단독주택 동일 기준 적용'] },
-      { heading: '품목별 요령', items: ['골판지: 테이프 제거 후 종이류로 분리배출', '보냉 택배 상자(비닐·알루미늄 안감): 종량제봉투', '투명 페트병: 라벨 제거 후 찌그러뜨려 별도 배출', '스티로폼: 이물질 제거 후 흰색만 분리배출'] },
-      { heading: '배출 시간', items: ['해진 후 ~ 자정 사이 배출 권장', '재활용 배출일은 자치구별 상이 (주 2회 이상)'] },
-      { heading: '문의', items: ['서울시 자원순환과: 02-2133-3735', '서울시 120 다산콜센터'] },
-    ]
-  },
-  'region-cheonan': {
-    title: '천안시 분리배출 가이드',
-    icon: '#3B7DD8',
-    color: '#E8F0FB',
-    sections: [
-      { heading: '천안시 분리배출 특징', items: ['요일별 배출제 시행 (지역에 따라 상이)', '투명 페트병 별도 분리배출', '대형 폐기물 사전 신고제 운영'] },
-      { heading: '품목별 요령', items: ['비닐류: 이물질 제거 후 투명 비닐봉투에 모아 배출', '스티로폼: 택배 상자 테이프·운송장 제거 후 배출', '폐형광등·폐건전지: 주민센터·아파트 전용수거함 배출'] },
-      { heading: '배출 요일', items: ['아파트: 단지 내 지정 요일 확인', '단독주택: 월·수·금 (재활용), 화·목·토 (일반)'] },
-      { heading: '문의', items: ['천안시 자원순환과: 041-521-5252', '천안시 청소행정과: 041-521-5280'] },
-    ]
-  },
-  'region-busan': {
-    title: '부산 남구 분리배출 가이드',
-    icon: '#D4890B',
-    color: '#FFF8E1',
-    sections: [
-      { heading: '부산 남구 분리배출 특징', items: ['요일별 배출제 시행', '플라스틱류 수요일 배출', '스티로폼 별도 배출 의무화'] },
-      { heading: '품목별 요령', items: ['플라스틱: 내용물 비우고 라벨 제거 후 수요일 배출', '종이류: 물기에 젖지 않게 묶어서 월요일 배출', '캔·고철: 내용물 비우고 화요일 배출', '스티로폼: 이물질 제거 후 금요일 배출'] },
-      { heading: '음식물쓰레기', items: ['RFID 종량제 시행 지역 확대', '전용 용기 사용, 물기 제거 후 배출'] },
-      { heading: '문의', items: ['부산 남구 자원순환과: 051-607-4471', '부산 남구청 홈페이지 > 분리배출 안내'] },
-    ]
-  },
-};
-
-function openGuide(type) {
-  const data = GUIDE_DATA[type];
-  if (!data) return;
-
-  const container = document.getElementById('guide-content');
-  const sections = data.sections;
-  // 섹션이 홀수면 마지막 하나를 full-width로
-  const gridSections = sections.map((sec, i) => {
-    const isLast = i === sections.length - 1 && sections.length % 2 === 1;
-    return `<div class="guide-section${isLast ? ' full-width' : ''}">
-        <h2>${sec.heading}</h2>
-        <ul>${sec.items.map(item => `<li>${item}</li>`).join('')}</ul>
-      </div>`;
-  }).join('');
-
-  container.innerHTML = `
-    <div class="guide-header" style="border-left: 4px solid ${data.icon}; background: ${data.color};">
-      <h1>${data.title}</h1>
-      <p>환경부 가이드라인 및 지역 조례 기반</p>
-    </div>
-    <div class="guide-sections-grid">
-      ${gridSections}
-    </div>
-    <div class="guide-cta">
-      <p>더 궁금한 점이 있으신가요?</p>
-      <button class="btn btn-primary" onclick="goToStart()">챗봇에게 질문하기</button>
-    </div>
-  `;
-
-  showPage('guide-page');
-  container.scrollTop = 0;
-}
-
-// ===== Landing Page =====
-function scrollToSection(e, id) {
-  e.preventDefault();
-  const el = document.getElementById(id);
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function goToChatWith(question, region) {
-  if (!currentUser) {
-    // 로그인 안 된 상태면 로그인 페이지로 → 로그인 후 챗봇 진입
-    sessionStorage.setItem('pendingQuestion', question);
-    sessionStorage.setItem('pendingRegion', region);
-    showPage('login-page');
-    return;
-  }
-  // 지역 설정
-  const regionSelect = document.getElementById('region-select');
-  if (region && regionSelect) {
-    regionSelect.value = region;
-  }
-  showPage('chat-page');
-  // 질문이 있으면 자동 전송
-  if (question) {
-    setTimeout(() => {
-      document.getElementById('chat-input').value = question;
-      sendMessage();
-    }, 300);
-  }
 }
 
 // ===== Auth =====
@@ -259,54 +116,39 @@ document.getElementById('login-form').addEventListener('submit', async function(
   e.preventDefault();
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
+  if (!email || !password) return;
 
+  // ⚠️ 원래 여기가 완전 목업(이메일/비번만 있으면 무조건 통과, 백엔드 호출
+  // 없음)이었다. 챗봇 대화 저장이 쿠키 기반 인증에 의존하다 보니, 로그인이
+  // 가짜면 채팅 연결도 무의미해서 실제 API 호출로 같이 바꿨다.
+  // 이건 원래 프론트 담당(B) 영역이라 손댄 범위가 커진 것 - 내일 공유 필요.
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      alert(err.detail || '로그인에 실패했습니다.');
+      alert('로그인 실패: 이메일 또는 비밀번호를 확인해 주세요.');
       return;
     }
-    const data = await res.json();
+    const user = await res.json();  // {id, email, name}
     currentUser = {
-      email: data.email,
-      name: data.name || data.email.split('@')[0],
-      isAdmin: data.email.includes('admin'),
+      email: user.email,
+      name: user.name || user.email.split('@')[0],
+      isAdmin: !!user.isAdmin,
     };
     initChat();
-    applyPendingChat();
+    showPage('chat-page');
   } catch (err) {
+    console.error('로그인 요청 실패:', err);
     alert('서버에 연결할 수 없습니다.');
   }
 });
 
-function applyPendingChat() {
-  const pendingQ = sessionStorage.getItem('pendingQuestion');
-  const pendingR = sessionStorage.getItem('pendingRegion');
-  if (pendingR) {
-    const regionSelect = document.getElementById('region-select');
-    if (regionSelect) regionSelect.value = pendingR;
-  }
-  sessionStorage.removeItem('pendingQuestion');
-  sessionStorage.removeItem('pendingRegion');
-  showPage('chat-page');
-  if (pendingQ) {
-    setTimeout(() => {
-      document.getElementById('chat-input').value = pendingQ;
-      sendMessage();
-    }, 300);
-  }
-}
-
-document.getElementById('signup-form').addEventListener('submit', async function(e) {
+document.getElementById('signup-form').addEventListener('submit', function(e) {
   e.preventDefault();
-  const name = document.getElementById('signup-name')?.value || '';
-  const email = document.getElementById('signup-email').value;
   const password = document.getElementById('signup-password').value;
   const confirm = document.getElementById('signup-password-confirm').value;
 
@@ -315,32 +157,16 @@ document.getElementById('signup-form').addEventListener('submit', async function
     return;
   }
 
-  try {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, display_name: name || email.split('@')[0] }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      alert(err.detail || '회원가입에 실패했습니다.');
-      return;
-    }
-    alert('회원가입이 완료되었습니다. 로그인해주세요.');
-    showPage('login-page');
-  } catch (err) {
-    alert('서버에 연결할 수 없습니다.');
-  }
+  alert('회원가입이 완료되었습니다. 로그인해주세요.');
+  showPage('login-page');
 });
 
-async function logout() {
-  try {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-  } catch (_) {}
+function logout() {
+  fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
   currentUser = null;
   chatSessions = [];
   currentSessionId = null;
-  showPage('landing-page');
+  showPage('login-page');
 }
 
 // ===== Chat Init =====
@@ -357,15 +183,56 @@ function initChat() {
     document.getElementById('admin-btn').style.display = 'block';
   }
 
-  // 첫 세션 생성
-  createNewSession();
+  // 대화 기록 복원 - 새로고침해도 이전 대화방들이 그대로 남아있도록.
+  // chat_messages.session_id로 대화방을 구분해서 저장하므로, 여기서는
+  // 대화방별로 복원한다. 복원된 대화방이 하나도 없으면 새 대화 하나를 만든다.
+  restoreAllSessions();
+}
+
+async function restoreAllSessions() {
+  try {
+    const res = await fetch('/api/chat/sessions', { credentials: 'include' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const groups = await res.json();  // [{session_id, messages: [{role, content, created_at}]}]
+
+    if (!groups.length) {
+      createNewSession();
+      return;
+    }
+
+    chatSessions = groups.map(g => {
+      const firstUserMsg = g.messages.find(m => m.role === 'user');
+      const title = firstUserMsg
+        ? (firstUserMsg.content.length > 20 ? firstUserMsg.content.substring(0, 20) + '...' : firstUserMsg.content)
+        : '대화';
+      return {
+        id: g.session_id,  // "legacy" 이거나 프론트가 보냈던 session_id 문자열
+        title,
+        region: g.region,  // 이 대화방에서 실제로 마지막에 쓰인 지역값 (서버가 계산)
+        messages: g.messages.map(m => ({
+          role: m.role === 'user' ? 'user' : 'bot',
+          content: m.content,
+          sources: [],
+        })),
+      };
+    });
+    currentSessionId = chatSessions[0].id;
+    document.getElementById('region-select').value = chatSessions[0].region;
+
+    renderChatList();
+    renderMessages();
+    updateRegionBadge();
+  } catch (err) {
+    console.error('대화 기록 복원 실패:', err);
+    createNewSession();  // 복원 실패해도 최소한 새 대화는 시작 가능하게
+  }
 }
 
 // ===== Sessions =====
 function createNewSession() {
   const region = document.getElementById('region-select').value;
   const session = {
-    id: Date.now(),
+    id: String(Date.now()),
     title: '새 대화',
     region: region,
     messages: []
@@ -410,10 +277,10 @@ function renderChatList() {
   const list = document.getElementById('chat-list');
   list.innerHTML = chatSessions.map(s => `
     <div class="chat-item ${s.id === currentSessionId ? 'active' : ''}"
-         onclick="switchSession(${s.id})">
+         onclick="switchSession('${s.id}')">
       <span class="chat-item-icon">💬</span>
       <span>${s.title}</span>
-      <button class="chat-item-delete" onclick="deleteSession(${s.id}, event)" title="삭제">✕</button>
+      <button class="chat-item-delete" onclick="deleteSession('${s.id}', event)" title="삭제">✕</button>
     </div>
   `).join('');
 }
@@ -460,21 +327,42 @@ function renderMessages() {
           <div class="message-avatar">${currentUser.name[0].toUpperCase()}</div>
           <div class="message-content">${msg.content}</div>
         </div>`;
+    } else if (msg.content !== undefined) {
+      // 실제 백엔드(/api/chat) 응답 형식: {answer, tip, source, sources}
+      const tipHtml = msg.tip
+        ? `<div class="response-section"><div class="section-title tip"><span class="section-icon">💡</span> 실천 팁</div><p>${msg.tip}</p></div>`
+        : '';
+      const sourceLabel = msg.source || (msg.sources && msg.sources.length
+        ? msg.sources.map(s => s.title).join(', ')
+        : '');
+      const sourcesHtml = sourceLabel ? `<span class="source-tag">출처: ${sourceLabel}</span>` : '';
+      return `
+        <div class="message bot">
+          <div class="message-avatar">🌿</div>
+          <div class="message-content">
+            <p style="white-space: pre-wrap;">${msg.content}</p>
+            ${tipHtml}
+            ${sourcesHtml}
+          </div>
+        </div>`;
     } else {
       return `
         <div class="message bot">
           <div class="message-avatar">🌿</div>
           <div class="message-content">
-            <div class="response-answer">
-              <div class="answer-label"><span class="answer-icon">📋</span> 답변</div>
-              <p>${msg.answer}</p>
+            <div class="response-section">
+              <div class="section-title guide"><span class="section-icon">📋</span> 가이드 근거</div>
+              <p>${msg.guide}</p>
             </div>
-            ${msg.tip ? `
-            <div class="response-tip">
-              <div class="tip-label"><span class="tip-icon">💡</span> 실천 팁</div>
+            <div class="response-section">
+              <div class="section-title law"><span class="section-icon">📄</span> 법률 근거</div>
+              <p>${msg.law}</p>
+            </div>
+            <div class="response-section">
+              <div class="section-title tip"><span class="section-icon">💡</span> 실천 팁</div>
               <p>${msg.tip}</p>
-            </div>` : ''}
-            ${msg.source ? `<div class="response-source">출처: ${msg.source}</div>` : ''}
+            </div>
+            <span class="source-tag">출처: ${msg.source}</span>
           </div>
         </div>`;
     }
@@ -491,13 +379,13 @@ function sendMessage() {
 
   addUserMessage(text);
   input.value = '';
-  fetchBotResponse(text);
+  askBackend(text);  // 대화 기록 저장/복원 기능 - 실제 백엔드 호출로 교체
 }
 
 function sendQuickQuestion(text) {
   if (isTyping) return;
   addUserMessage(text);
-  fetchBotResponse(text);
+  askBackend(text);
 }
 
 function addUserMessage(text) {
@@ -515,13 +403,10 @@ function addUserMessage(text) {
   renderMessages();
 }
 
-async function fetchBotResponse(question) {
+async function askBackend(question) {
   isTyping = true;
   const container = document.getElementById('chat-messages');
-  const session = chatSessions.find(s => s.id === currentSessionId);
-  if (!session) { isTyping = false; return; }
 
-  // 타이핑 인디케이터
   const typingDiv = document.createElement('div');
   typingDiv.className = 'message bot';
   typingDiv.id = 'typing-indicator';
@@ -537,40 +422,45 @@ async function fetchBotResponse(question) {
   container.appendChild(typingDiv);
   container.scrollTop = container.scrollHeight;
 
-  // region 매핑: 프론트의 'busan-namgu' → 백엔드의 'busan_namgu'
-  const regionMap = { 'busan-namgu': 'busan_namgu' };
-  const region = regionMap[session.region] || session.region;
+  const session = chatSessions.find(s => s.id === currentSessionId);
 
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ question, region }),
+      headers: { 'Content-Type': 'application/json' },
+      // 실제 ChatRequest 스키마: {question, region}. region-select 드롭다운 값을
+      // 그대로 보낸다 - 화면엔 이미 있던 드롭다운인데 원래 백엔드로 전달을
+      // 안 하고 있었음(목업이라 상관없었음). 이제 실제로 전달되게 연결.
+      body: JSON.stringify({
+        question,
+        region: session ? session.region : 'seoul',
+        session_id: session ? String(session.id) : null,
+      }),
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();  // {answer, tip, source, sources}
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || '답변 생성에 실패했습니다.');
+    if (session) {
+      session.messages.push({
+        role: 'bot',
+        content: data.answer,
+        tip: data.tip || '',
+        source: data.source || '',
+        sources: data.sources || [],
+      });
     }
-
-    const data = await res.json();
-    session.messages.push({
-      role: 'bot',
-      answer: data.answer || '',
-      tip: data.tip || '',
-      source: data.source || '',
-    });
   } catch (err) {
-    session.messages.push({
-      role: 'bot',
-      answer: `오류가 발생했습니다: ${err.message}`,
-      tip: '서버 상태를 확인하거나 잠시 후 다시 시도해 주세요.',
-      source: '',
-    });
+    console.error('챗봇 응답 실패:', err);
+    if (session) {
+      session.messages.push({
+        role: 'bot',
+        content: '답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        sources: [],
+      });
+    }
   }
 
-  // 타이핑 인디케이터 제거 후 렌더링
   const typing = document.getElementById('typing-indicator');
   if (typing) typing.remove();
 
@@ -597,232 +487,3 @@ function switchAdminTab(tabName) {
   document.querySelectorAll('.admin-content').forEach(c => c.classList.add('hidden'));
   document.getElementById(`tab-${tabName}`).classList.remove('hidden');
 }
-
-// ===== Admin Dashboard Data =====
-const REGION_COLORS = ['#2D8B4E', '#3B7DD8', '#D4890B', '#8B5CF6', '#E5484D'];
-
-async function loadAdminDashboard() {
-  await Promise.all([loadStats(), loadRegionStats(), loadTopQuestions(), loadDailyTrend(), loadDocuments()]);
-}
-
-async function loadStats() {
-  try {
-    const res = await fetch('/api/admin/stats', { credentials: 'include' });
-    if (!res.ok) return;
-    const d = await res.json();
-    document.getElementById('stat-total').textContent = d.total.toLocaleString();
-    document.getElementById('stat-today').textContent = d.today.toLocaleString();
-    document.getElementById('stat-users').textContent = d.active_users.toLocaleString();
-    document.getElementById('stat-success').textContent = d.success_rate + '%';
-
-    const weekEl = document.getElementById('stat-week-change');
-    weekEl.textContent = (d.week_change >= 0 ? '+' : '') + d.week_change + '% vs 지난주';
-    if (d.week_change > 0) weekEl.classList.add('up');
-
-    const todayEl = document.getElementById('stat-today-diff');
-    const diff = d.today_diff;
-    todayEl.textContent = (diff >= 0 ? '+' : '') + diff + ' vs 어제';
-    if (diff > 0) todayEl.classList.add('up');
-  } catch (_) {}
-}
-
-async function loadRegionStats() {
-  try {
-    const res = await fetch('/api/admin/region-stats', { credentials: 'include' });
-    if (!res.ok) return;
-    const data = await res.json();
-    const container = document.getElementById('region-stats-container');
-
-    if (data.length === 0) {
-      container.innerHTML = '<p class="stat-placeholder">아직 질문 데이터가 없습니다.</p>';
-      return;
-    }
-
-    const maxCount = Math.max(...data.map(r => r.count));
-    container.innerHTML = data.map((r, i) => `
-      <div class="region-bar">
-        <span class="region-bar-label">${r.label}</span>
-        <div class="region-bar-track">
-          <div class="region-bar-fill" style="width: ${Math.round(r.count / maxCount * 100)}%; background: ${REGION_COLORS[i % REGION_COLORS.length]};"></div>
-        </div>
-        <span class="region-bar-value">${r.count}</span>
-      </div>
-    `).join('');
-  } catch (_) {}
-}
-
-async function loadTopQuestions() {
-  try {
-    const res = await fetch('/api/admin/top-questions?limit=5', { credentials: 'include' });
-    if (!res.ok) return;
-    const data = await res.json();
-    const container = document.getElementById('top-questions-container');
-
-    if (data.length === 0) {
-      container.innerHTML = '<p class="stat-placeholder">아직 질문 데이터가 없습니다.</p>';
-      return;
-    }
-
-    container.innerHTML = '<div class="top-questions-list">' + data.map((q, i) => `
-      <div class="top-question-item">
-        <span class="top-question-rank">${i + 1}</span>
-        <span class="top-question-text">${q.question.length > 25 ? q.question.substring(0, 25) + '...' : q.question}</span>
-        <span class="top-question-count">${q.count}</span>
-      </div>
-    `).join('') + '</div>';
-  } catch (_) {}
-}
-
-async function loadDailyTrend() {
-  try {
-    const res = await fetch('/api/admin/daily-trend', { credentials: 'include' });
-    if (!res.ok) return;
-    const data = await res.json();
-    const container = document.getElementById('daily-chart-container');
-
-    const maxCount = Math.max(...data.map(d => d.count), 1);
-    container.innerHTML = '<div class="daily-bars">' + data.map((d, i) => {
-      const height = Math.max(4, Math.round(d.count / maxCount * 100));
-      const isToday = i === data.length - 1;
-      return `
-        <div class="daily-bar-col">
-          <span class="daily-bar-count">${d.count}</span>
-          <div class="daily-bar" style="height: ${height}px; opacity: ${isToday ? 1 : 0.5 + (i / data.length) * 0.4};"></div>
-          <span class="daily-bar-label ${isToday ? 'today' : ''}">${isToday ? '오늘' : d.day}</span>
-        </div>`;
-    }).join('') + '</div>';
-  } catch (_) {}
-}
-
-async function loadDocuments() {
-  try {
-    const res = await fetch('/api/admin/documents', { credentials: 'include' });
-    if (!res.ok) return;
-    const data = await res.json();
-
-    // 인덱스 상태
-    const statusEl = document.getElementById('index-status');
-    if (data.index_exists) {
-      statusEl.innerHTML = '<span class="index-dot active"></span><span>인덱스 상태: <strong>정상</strong> (' + data.total_chunks + ' chunks)</span>';
-    } else {
-      statusEl.innerHTML = '<span class="index-dot"></span><span>인덱스 상태: <strong>미생성</strong></span>';
-    }
-
-    // 문서 테이블
-    const tbody = document.getElementById('doc-table-body');
-    if (data.documents.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="stat-placeholder">인덱싱된 문서가 없습니다.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = data.documents.map(d => `
-      <tr>
-        <td>${d.title}</td>
-        <td><span class="type-badge ${d.source_type}">${d.type_label}</span></td>
-        <td>${d.region_label}</td>
-        <td>${d.chunk_count}</td>
-      </tr>
-    `).join('');
-  } catch (_) {}
-}
-
-async function rebuildIndex() {
-  const btn = event.target;
-  btn.disabled = true;
-  btn.textContent = '재빌드 중...';
-  try {
-    const res = await fetch('/api/rag/rebuild', { method: 'POST', credentials: 'include' });
-    const data = await res.json();
-    alert('인덱스 재빌드 완료: ' + data.indexed_chunks + ' chunks');
-    await loadDocuments();
-  } catch (err) {
-    alert('재빌드 실패: ' + err.message);
-  }
-  btn.disabled = false;
-  btn.textContent = '🔄 인덱스 재빌드';
-}
-
-// ===== File Upload =====
-async function handleFileUpload(input) {
-  const file = input.files[0];
-  if (!file) return;
-  await uploadFile(file);
-  input.value = '';
-}
-
-async function uploadFile(file) {
-  const allowed = ['.txt', '.md', '.pdf'];
-  const ext = '.' + file.name.split('.').pop().toLowerCase();
-  if (!allowed.includes(ext)) {
-    alert('허용되지 않는 파일 형식입니다. (.txt, .md, .pdf만 가능)');
-    return;
-  }
-
-  const progressEl = document.getElementById('upload-progress');
-  const barEl = document.getElementById('upload-progress-bar');
-  const textEl = document.getElementById('upload-progress-text');
-  progressEl.classList.remove('hidden');
-  barEl.style.width = '30%';
-  textEl.textContent = `"${file.name}" 업로드 중...`;
-
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    barEl.style.width = '60%';
-    const res = await fetch('/api/admin/upload', {
-      method: 'POST',
-      credentials: 'include',
-      body: formData,
-    });
-
-    barEl.style.width = '90%';
-    const data = await res.json();
-
-    if (!res.ok) {
-      textEl.textContent = '업로드 실패: ' + (data.detail || '알 수 없는 오류');
-      setTimeout(() => progressEl.classList.add('hidden'), 3000);
-      return;
-    }
-
-    barEl.style.width = '100%';
-    textEl.textContent = `"${data.filename}" 업로드 완료! (${data.indexed_chunks || 0} chunks)`;
-    await loadDocuments();
-    setTimeout(() => progressEl.classList.add('hidden'), 3000);
-  } catch (err) {
-    textEl.textContent = '업로드 실패: ' + err.message;
-    setTimeout(() => progressEl.classList.add('hidden'), 3000);
-  }
-}
-
-// Drag & Drop
-document.addEventListener('DOMContentLoaded', () => {
-  const area = document.getElementById('upload-area');
-  if (!area) return;
-
-  ['dragenter', 'dragover'].forEach(evt => {
-    area.addEventListener(evt, e => { e.preventDefault(); area.classList.add('drag-over'); });
-  });
-  ['dragleave', 'drop'].forEach(evt => {
-    area.addEventListener(evt, e => { e.preventDefault(); area.classList.remove('drag-over'); });
-  });
-  area.addEventListener('drop', e => {
-    const file = e.dataTransfer.files[0];
-    if (file) uploadFile(file);
-  });
-});
-
-// ===== 페이지 로드 시 세션 복원 =====
-(async function checkSession() {
-  try {
-    const res = await fetch('/api/me', { credentials: 'include' });
-    if (res.ok) {
-      const data = await res.json();
-      currentUser = {
-        email: data.email,
-        name: data.name || data.email.split('@')[0],
-        isAdmin: data.email.includes('admin'),
-      };
-      initChat();
-    }
-  } catch (_) {}
-})();

@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     # Gemini API 키 (팀 config에 이미 있다면 이 줄은 생략)
     GEMINI_API_KEY: str = ""
 
+    # ── OpenAI (EMBEDDING_BACKEND=openai 일 때 사용) ──
+    OPENAI_API_KEY: str = ""
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+    OPENAI_EMBEDDING_DIMENSION: int = 1536
+
     # FAISS 인덱스 + 청크 JSON 저장 디렉터리
     INDEX_DIR: Path = BASE_DIR / "data" / "indexes"
 
