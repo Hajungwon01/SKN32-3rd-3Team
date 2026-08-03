@@ -1,0 +1,417 @@
+[
+  {
+    "id": "q001",
+    "type": "single_fact",
+    "question": "종이컵은 어떻게 버리나요?",
+    "expected_source": "환경부 공통",
+    "expected_label": "품목별 분리배출 요령 > 종이류",
+    "reference_answer": "내용물을 비우고 물로 헹군 뒤 압착해서 종이류로 배출합니다. 다만 양면이 코팅된 종이컵은 재활용이 되지 않아 종량제봉투에 버려야 합니다.",
+    "must_mention": [
+      "종량제"
+    ],
+    "should_have_answer": true,
+    "must_match_any": [
+      "헹구",
+      "씻",
+      "물로",
+      "비우"
+    ],
+    "region": "seoul"
+  },
+  {
+    "id": "q002",
+    "type": "single_fact",
+    "question": "달걀 껍질은 음식물쓰레기인가요?",
+    "expected_source": "환경부 공통",
+    "expected_label": "음식물쓰레기 분류 기준 > 일반쓰레기로 배출하는 것",
+    "reference_answer": "아닙니다. 달걀·오리알·메추리알 등의 껍데기는 동물 사료로 쓸 수 없어 일반쓰레기(종량제봉투)로 배출해야 합니다.",
+    "must_mention": [
+      "일반쓰레기"
+    ],
+    "should_have_answer": true,
+    "region": "cheonan"
+  },
+  {
+    "id": "q003",
+    "type": "single_fact",
+    "question": "다 쓴 부탄가스 통은 어떻게 버려요?",
+    "expected_source": "환경부 공통",
+    "expected_label": "품목별 분리배출 요령 > 금속캔",
+    "reference_answer": "통풍이 잘 되는 장소에서 노즐을 눌러 내용물을 완전히 제거한 뒤 금속캔으로 배출합니다. 내용물이 남아 있으면 폭발 위험이 있어 특수규격마대로 배출해야 합니다.",
+    "must_mention": [
+      "노즐",
+      "제거"
+    ],
+    "should_have_answer": true,
+    "region": "cheonan"
+  },
+  {
+    "id": "q004",
+    "type": "single_fact",
+    "question": "생수병 라벨은 떼고 버려야 하나요?",
+    "expected_source": "환경부 공통",
+    "expected_label": "품목별 분리배출 요령 > 무색 투명 페트(PET)병",
+    "reference_answer": "네, 내용물을 비우고 부착상표(라벨)를 제거한 뒤 가능한 압착해서 뚜껑을 닫아 배출합니다. 무색 투명 페트병은 유색 페트병과 분리해서 별도로 배출해야 합니다.",
+    "must_mention": [
+      "라벨",
+      "제거"
+    ],
+    "should_have_answer": true,
+    "region": "seoul"
+  },
+  {
+    "id": "q005",
+    "type": "single_fact",
+    "question": "깨진 유리는 어디에 버리나요?",
+    "expected_source": "환경부 공통",
+    "expected_label": "품목별 분리배출 요령 > 유리병",
+    "reference_answer": "깨진 유리는 재활용이 되지 않으므로 신문지에 싸서 종량제봉투에 버립니다. 양이 많으면 특수규격마대를 사용합니다.",
+    "must_mention": [
+      "신문지",
+      "종량제"
+    ],
+    "should_have_answer": true,
+    "region": "seoul"
+  },
+  {
+    "id": "q006",
+    "type": "single_fact",
+    "question": "안 입는 옷은 어떻게 처리하나요?",
+    "expected_source": "부산 남구",
+    "expected_label": "품목별 분리배출 요령 > 의류",
+    "reference_answer": "깨끗한 헌 옷은 폐의류 전용 수거함에 젖지 않도록 배출합니다. 재활용이 어려운 헌 옷·신발·가방은 종량제봉투에 버리고, 솜이불이나 쿠션은 대형폐기물로 신고해야 합니다.",
+    "must_mention": [
+      "수거함"
+    ],
+    "should_have_answer": true,
+    "region": "busan_namgu"
+  },
+  {
+    "id": "q007",
+    "type": "single_fact",
+    "question": "택배 상자에 붙은 송장은 떼야 하나요?",
+    "expected_source": "서울시",
+    "expected_label": "품목별 분리배출 요령 > 비닐류",
+    "reference_answer": "네, 떼야 합니다. 택배 전표(송장)는 재활용이 되지 않아 종량제봉투에 버려야 하고, 상자는 테이프와 송장을 제거한 뒤 종이류로 분리배출합니다.",
+    "must_mention": [
+      "종량제"
+    ],
+    "should_have_answer": true,
+    "region": "seoul"
+  },
+  {
+    "id": "q008",
+    "type": "single_fact",
+    "question": "음식물쓰레기 물기를 왜 제거해야 하나요?",
+    "expected_source": "환경부 공통",
+    "expected_label": "음식물쓰레기 분류 기준 > 음식물쓰레기 배출 시 주의사항",
+    "reference_answer": "물기만 줄여도 배출량을 20% 이상 줄일 수 있기 때문입니다. 또한 비닐·병뚜껑·이쑤시개·뼈·패각류 같은 이물질도 제거한 뒤 배출해야 합니다.",
+    "must_mention": [
+      "20"
+    ],
+    "should_have_answer": true,
+    "region": "seoul"
+  },
+  {
+    "id": "q009",
+    "type": "region_specific",
+    "question": "비닐은 언제 버려요?",
+    "expected_source": "부산 남구",
+    "expected_label": "품목별 분리배출 요령 > 비닐류",
+    "reference_answer": "부산 남구는 분리배출 표시가 된 비닐을 이물질을 제거한 뒤 일정량 모아 매주 월요일에 배출합니다.",
+    "must_mention": [
+      "월요일"
+    ],
+    "should_have_answer": true,
+    "region": "busan_namgu",
+    "forbidden_mention": [
+      "서울",
+      "천안"
+    ],
+    "must_match_any": [],
+    "note": "부산 선택 시 부산 기준으로 답해야 하며 타 지역 기준을 섞으면 안 된다."
+  },
+  {
+    "id": "q010",
+    "type": "region_specific",
+    "question": "투명 페트병만 따로 버리는 날이 있나요?",
+    "expected_source": "천안시",
+    "expected_label": "품목별 분리배출 요령 > 투명 페트병",
+    "reference_answer": "천안시는 투명 폐페트병 분리배출 시범사업에 따라 목요일에 투명 페트병만 별도로 배출합니다. 라벨을 제거하고 압축해 뚜껑을 닫아 배출하세요.",
+    "must_mention": [
+      "목요일"
+    ],
+    "should_have_answer": true,
+    "region": "cheonan",
+    "forbidden_mention": [
+      "서울",
+      "부산"
+    ],
+    "must_match_any": [],
+    "note": "천안 선택 시 목요일 시범사업 내용을 답해야 한다."
+  },
+  {
+    "id": "q011",
+    "type": "region_specific",
+    "question": "음식물쓰레기는 어디에 담아서 버리나요?",
+    "expected_source": "부산 남구",
+    "expected_label": "부산 남구 음식물쓰레기 배출 요령 > 배출 방법",
+    "reference_answer": "부산 남구는 음식물쓰레기 전용용기에 담고 납부필증을 부착해 배출합니다. 전용용기는 3리터 6,500원, 5리터 7,000원, 20리터 15,000원이며 지정 판매소에서 구입합니다.",
+    "must_mention": [
+      "전용용기"
+    ],
+    "should_have_answer": true,
+    "region": "busan_namgu",
+    "must_match_any": [
+      "납부필증",
+      "6,500",
+      "지정 판매소"
+    ],
+    "forbidden_mention": [
+      "서울",
+      "천안"
+    ],
+    "note": "부산은 전용용기+납부필증, 천안은 전용봉투로 방식이 다르다."
+  },
+  {
+    "id": "q012",
+    "type": "region_specific",
+    "question": "쓰레기는 몇 시에 내놔야 하나요?",
+    "expected_source": "부산 남구",
+    "expected_label": "부산 남구 생활쓰레기 배출 안내 > 배출 시간",
+    "reference_answer": "부산 남구는 저녁 7시부터 밤 11시 사이에 대문 앞이나 업소 출입구에 배출하도록 정하고 있습니다.",
+    "must_mention": [],
+    "should_have_answer": true,
+    "region": "busan_namgu",
+    "must_match_any": [
+      "7시",
+      "저녁"
+    ],
+    "forbidden_mention": [
+      "서울",
+      "천안"
+    ],
+    "note": "배출 시간이 명시된 지역은 부산 남구뿐이다."
+  },
+  {
+    "id": "q013",
+    "type": "cross_reference",
+    "question": "분리배출을 꼭 해야 하는 법적 의무가 있나요?",
+    "expected_source": "폐기물관리법",
+    "expected_label": "",
+    "reference_answer": "네, 법으로 정해진 의무입니다. 폐기물관리법 제15조에 따라 생활폐기물배출자는 지자체 조례가 정하는 바에 따라 폐기물을 종류별·성질별로 분리하여 보관하고 배출해야 합니다. 또한 같은 법 제8조는 지정된 장소나 방법을 따르지 않고 생활폐기물을 버리는 행위를 금지하고 있습니다.",
+    "must_mention": [],
+    "should_have_answer": true,
+    "must_match_any": [
+      "폐기물관리법",
+      "분리수거 등에 관한 지침",
+      "제15조",
+      "제14조"
+    ],
+    "region": "seoul"
+  },
+  {
+    "id": "q014",
+    "type": "cross_reference",
+    "question": "순환자원이 뭔가요?",
+    "expected_source": "순환경제사회 전환 촉진법",
+    "expected_label": "",
+    "reference_answer": "순환경제사회 전환 촉진법 제2조에 따르면 순환자원이란 기후에너지환경부장관이 산업통상부장관과 협의하여 인정하거나 지정·고시한 물질 또는 물건을 말합니다. 같은 조에서 순환이용은 폐기물을 재사용·재생이용하거나 에너지를 회수하는 활동으로 정의하고 있습니다.",
+    "must_mention": [],
+    "should_have_answer": true,
+    "must_match_any": [
+      "순환경제사회",
+      "제2조"
+    ],
+    "region": "seoul"
+  },
+  {
+    "id": "q015",
+    "type": "cross_reference",
+    "question": "일회용품 사용을 줄여야 하는 이유가 법에도 있나요?",
+    "expected_source": "자원의 절약과 재활용촉진에 관한 법률",
+    "expected_label": "",
+    "reference_answer": "네, 법에 규정되어 있습니다. 순환경제사회 전환 촉진법 제7조는 모든 국민이 일회용품 사용을 자제하도록 노력할 책무를 정하고 있고, 자원의 절약과 재활용촉진에 관한 법률 제10조는 특정 시설·업종 사업자가 일회용품 사용을 억제하고 무상 제공하지 않도록 의무를 부과하고 있습니다.",
+    "must_mention": [],
+    "should_have_answer": true,
+    "must_match_any": [
+      "제7조",
+      "제10조"
+    ],
+    "region": "seoul"
+  },
+  {
+    "id": "q016",
+    "type": "no_answer",
+    "question": "대구 수성구 음식물쓰레기 배출 요일은 언제인가요?",
+    "expected_source": "",
+    "expected_label": "",
+    "reference_answer": "대구 수성구 자료는 보유하고 있지 않아 안내드릴 수 없습니다. 배출 요일은 지자체 조례로 정해지므로 대구 수성구청에 확인하셔야 합니다.",
+    "forbidden_mention": [
+      "부산",
+      "일요일",
+      "화요일",
+      "목요일"
+    ],
+    "should_have_answer": false,
+    "note": "부산 남구 배출 요일(0.65)이 높은 유사도로 검색됨. 이를 대구 기준인 것처럼 답하면 오답",
+    "region": "busan_namgu"
+  },
+  {
+    "id": "q017",
+    "type": "region_specific",
+    "question": "제주도에서 페트병은 어떻게 버리나요?",
+    "expected_source": "제주",
+    "expected_label": "",
+    "reference_answer": "제주는 집 앞 문전수거가 아니라 클린하우스나 재활용도움센터에 직접 가져가 배출합니다. 투명페트병은 내용물을 비우고 라벨을 제거한 뒤 전용수거함에 넣으면 되고, 플라스틱류는 월·수·금·일요일 지정 요일에 배출합니다. 요일에 관계없이 배출하려면 재활용도움센터를 이용하세요.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안"
+    ],
+    "should_have_answer": true,
+    "note": "제주 가이드 추가로 no_answer → region_specific 으로 전환된 문항.",
+    "region": "jeju",
+    "must_mention": [],
+    "must_match_any": [
+      "클린하우스",
+      "재활용도움센터"
+    ]
+  },
+  {
+    "id": "q018",
+    "type": "no_answer",
+    "question": "의료폐기물은 어떻게 처리하나요?",
+    "expected_source": "",
+    "expected_label": "",
+    "reference_answer": "의료폐기물에 대한 자료는 보유하고 있지 않습니다. 의료폐기물은 별도의 법령과 처리 절차를 따르므로 관할 보건소나 전문 처리업체에 문의하셔야 합니다.",
+    "forbidden_mention": [
+      "종량제봉투",
+      "분리배출함"
+    ],
+    "should_have_answer": false,
+    "note": "자원순환기본법 조문(0.63)이 검색되지만 의료폐기물 처리 방법은 담고 있지 않음",
+    "region": "seoul"
+  },
+  {
+    "id": "q019",
+    "type": "no_answer",
+    "question": "전기차 폐배터리는 어디에 신고하나요?",
+    "expected_source": "",
+    "expected_label": "",
+    "reference_answer": "전기차 폐배터리 관련 자료는 보유하고 있지 않습니다. 일반 전지류 배출 요령과는 절차가 다르므로 제조사나 지자체에 확인하셔야 합니다.",
+    "forbidden_mention": [
+      "전지류 수거함",
+      "전용 수거함에 배출",
+      "폐건전지 전용",
+      "주민센터"
+    ],
+    "should_have_answer": false,
+    "note": "유해폐기물 가이드의 리튬 배터리(보조배터리·전자담배) 안내를 전기차 폐배터리에 적용하면 오답. 처리 주체와 절차가 다름.",
+    "region": "seoul"
+  },
+  {
+    "id": "q020",
+    "type": "no_answer",
+    "question": "이번 주 로또 당첨번호 알려줘",
+    "expected_source": "",
+    "expected_label": "",
+    "reference_answer": "관련 자료를 찾을 수 없습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": false,
+    "note": "주제가 완전히 무관. 임계값(0.36)에서 차단되어야 함",
+    "region": "seoul"
+  },
+  {
+    "id": "q021",
+    "type": "single_fact",
+    "region": "cheonan",
+    "question": "천안에서 달걀껍질은 음식물쓰레기인가요?",
+    "expected_source": "천안시",
+    "expected_label": "천안시 음식물쓰레기 배출 요령 > 일반쓰레기로 배출해야 하는 음식물",
+    "reference_answer": "아닙니다. 천안시 기준으로 알 껍질(달걀·메추리알)은 일반쓰레기로 배출해야 하는 음식물로 분류되어 있어 종량제봉투에 버려야 합니다.",
+    "must_mention": [
+      "일반쓰레기"
+    ],
+    "forbidden_mention": [
+      "음식물쓰레기로 배출해야",
+      "음식물쓰레기로 배출하면"
+    ],
+    "should_have_answer": true,
+    "note": "실제 화면 테스트에서 발견한 오류. 청크 라벨의 상위 제목('음식물쓰레기 배출 요령')만 보고 하위 분류('일반쓰레기로 배출해야 하는 음식물')를 반대로 해석하는 문제."
+  },
+  {
+    "id": "q022",
+    "type": "region_specific",
+    "region": "jeju",
+    "question": "음식물쓰레기는 어떻게 버리나요?",
+    "expected_source": "제주",
+    "expected_label": "",
+    "reference_answer": "제주는 클린하우스나 재활용도움센터의 RFID 개별계량장비에 티머니 교통카드를 대고 무게만큼 수수료를 결제해 배출합니다. 카드 잔액이 1,000원 이상이어야 하며, 물기를 꽉 짜고 이물질을 제외한 뒤 배출하세요.",
+    "must_mention": [],
+    "must_match_any": [
+      "RFID",
+      "티머니",
+      "개별계량"
+    ],
+    "forbidden_mention": [
+      "전용봉투",
+      "납부필증"
+    ],
+    "should_have_answer": true,
+    "note": "지역마다 음식물 배출 방식이 다름(제주 RFID / 세종 전용봉투 / 부산 납부필증)."
+  },
+  {
+    "id": "q023",
+    "type": "region_specific",
+    "region": "sejong",
+    "question": "쓰레기를 어디에 버려야 하나요?",
+    "expected_source": "세종",
+    "expected_label": "",
+    "reference_answer": "세종시는 동지역과 읍면지역 방식이 다릅니다. 동지역은 종량제봉투에 담아 자동크린넷 투입구에 넣고, 읍면지역은 지정 장소에 내놓는 문전수거 방식입니다. 모든 쓰레기는 해가 진 후 배출해야 합니다.",
+    "must_mention": [],
+    "must_match_any": [
+      "크린넷",
+      "자동크린넷"
+    ],
+    "forbidden_mention": [
+      "클린하우스"
+    ],
+    "should_have_answer": true,
+    "note": "세종 자동크린넷과 제주 클린하우스는 이름이 비슷해 혼동 위험이 있다."
+  },
+  {
+    "id": "q024",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "텀블러 쓰면 포인트 받을 수 있나요?",
+    "expected_source": "탄소중립",
+    "expected_label": "",
+    "reference_answer": "네, 탄소중립포인트제의 녹색생활 실천 항목에 텀블러·다회용컵 이용이 포함되어 있습니다. 탄소중립포인트 누리집에 가입한 뒤 참여기업 매장에서 실천하면 적립되며, 매장 자체 할인과 중복으로 받을 수 있습니다.",
+    "must_mention": [
+      "탄소중립포인트"
+    ],
+    "must_match_any": [],
+    "forbidden_mention": [],
+    "should_have_answer": true,
+    "note": "새로 추가된 탄소중립 가이드 커버리지 확인."
+  },
+  {
+    "id": "q025",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "카페에서 종이컵 써도 되나요?",
+    "expected_source": "일회용품",
+    "expected_label": "",
+    "reference_answer": "현재 종이컵은 2023년 11월 매장 내 사용금지 규제에서 제외되어 사용할 수 있습니다. 다만 2025년 12월 정부가 큰 규모 매장부터 종이컵 금지를 단계적으로 재추진하겠다고 발표해 변동될 수 있습니다. 매장 내 일회용 플라스틱컵은 여전히 규제 대상입니다.",
+    "must_mention": [],
+    "must_match_any": [
+      "제외",
+      "허용",
+      "사용할 수"
+    ],
+    "forbidden_mention": [],
+    "should_have_answer": true,
+    "note": "규제 현황처럼 시점에 따라 바뀌는 정보를 문서 기준으로 답하는지 확인."
+  }
+]

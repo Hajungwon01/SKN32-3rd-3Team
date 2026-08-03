@@ -82,6 +82,16 @@ def search(query_vector: list[float], top_k: int | None = None) -> list[dict]:
     index = faiss.read_index(str(_index_path()))
     chunks: list[dict] = json.loads(_meta_path().read_text(encoding="utf-8"))
 
+    # 인덱스를 만든 백엔드와 지금 백엔드의 차원이 다르면 검색이 불가능하다.
+    # FAISS 는 assert 로만 알려줘서 원인 파악이 어려우므로 먼저 확인한다.
+    if len(query_vector) != index.d:
+        raise RuntimeError(
+            f"임베딩 차원이 인덱스와 다릅니다. "
+            f"(인덱스 {index.d}차원 / 현재 백엔드 {len(query_vector)}차원)\n"
+            "  EMBEDDING_BACKEND 를 바꾼 뒤 재인덱싱하지 않아서 생기는 문제입니다.\n"
+            "  → python -m scripts.seed_docs 를 실행해 인덱스를 다시 만드세요."
+        )
+
     query = np.asarray([query_vector], dtype=np.float32)
     faiss.normalize_L2(query)
 
