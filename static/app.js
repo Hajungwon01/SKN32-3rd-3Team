@@ -288,8 +288,10 @@ document.getElementById('login-form').addEventListener('submit', async function(
   }
 });
 
-document.getElementById('signup-form').addEventListener('submit', function(e) {
+document.getElementById('signup-form').addEventListener('submit', async function(e) {
   e.preventDefault();
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
   const password = document.getElementById('signup-password').value;
   const confirm = document.getElementById('signup-password-confirm').value;
 
@@ -298,8 +300,22 @@ document.getElementById('signup-form').addEventListener('submit', function(e) {
     return;
   }
 
-  alert('회원가입이 완료되었습니다. 로그인해주세요.');
-  showPage('login-page');
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, display_name: name }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.detail || '회원가입에 실패했습니다.');
+      return;
+    }
+    alert('회원가입이 완료되었습니다. 로그인해주세요.');
+    showPage('login-page');
+  } catch (err) {
+    alert('서버에 연결할 수 없습니다.');
+  }
 });
 
 function logout() {
@@ -382,7 +398,9 @@ async function restoreAllSessions() {
         messages: g.messages.map(m => ({
           role: m.role === 'user' ? 'user' : 'bot',
           content: m.content,
-          sources: [],
+          tip: m.tip || '',
+          source: m.source || '',
+          sources: m.sources || [],
         })),
       };
     });

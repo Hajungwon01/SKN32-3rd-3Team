@@ -119,5 +119,7 @@ class ChatMessage(Base):
     region = Column(String(50), nullable=True)
     role = Column(String(20), nullable=False)  # "user" | "assistant"
     content = Column(LongText, nullable=False)
+    tip = Column(Text, nullable=True)
+    sources = Column(LongText, nullable=True)  # JSON 문자열 (예: '[{"title":...,"snippet":...}]')
     created_at = Column(DateTime, server_default=func.now())
     owner = relationship("User")

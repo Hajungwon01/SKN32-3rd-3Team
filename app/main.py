@@ -39,6 +39,31 @@ with engine.connect() as conn:
         except Exception as e:
             print(f"[DB] 컬럼 추가 실패: {e}")
 
+    # chat_messages.tip / sources 컬럼 추가
+    for col in ("tip", "sources"):
+        try:
+            conn.execute(_sa.text(f"SELECT {col} FROM chat_messages LIMIT 1"))
+        except Exception:
+            try:
+                conn.execute(_sa.text(f"ALTER TABLE chat_messages ADD COLUMN {col} TEXT"))
+                conn.commit()
+                print(f"[DB] chat_messages.{col} 컬럼 추가 완료")
+            except Exception as e:
+                print(f"[DB] 컬럼 추가 실패: {e}")
+
+    # 이전 source 컬럼이 있으면 sources로 이름 변경 (SQLite는 RENAME COLUMN 지원)
+    try:
+        conn.execute(_sa.text("SELECT source FROM chat_messages LIMIT 1"))
+        # source 컬럼이 존재하면 sources가 없을 때만 마이그레이션
+        try:
+            conn.execute(_sa.text("SELECT sources FROM chat_messages LIMIT 1"))
+        except Exception:
+            conn.execute(_sa.text("ALTER TABLE chat_messages RENAME COLUMN source TO sources"))
+            conn.commit()
+            print("[DB] chat_messages.source → sources 컬럼명 변경 완료")
+    except Exception:
+        pass  # source 컬럼 자체가 없으면 무시
+
 # ─── 서버 시작 시 기존 질문 클러스터 마이그레이션 ──────────────────────
 @app.on_event("startup")
 def _migrate_clusters():
