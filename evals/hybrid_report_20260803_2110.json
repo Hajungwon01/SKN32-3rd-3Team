@@ -1,0 +1,147 @@
+{
+  "measured_at": "2026-08-03T21:09:26",
+  "source_file": "hybrid_results_20260803_2109.json",
+  "config": {
+    "eval_method": "llm_hybrid",
+    "llm_model": "gpt-4o-mini",
+    "embedding_backend": "local",
+    "rag_min_score": 0.3,
+    "rag_top_k": 6,
+    "chunk_size": 700,
+    "chunk_overlap": 100
+  },
+  "summary": {
+    "total": 30,
+    "passed": 26,
+    "pass_rate": 0.8667,
+    "avg_correctness": 4.48,
+    "hallucination_count": 3,
+    "hallucination_rate": 0.1,
+    "refusal_accuracy": 1.0,
+    "false_refusal_count": 0
+  },
+  "score_distribution": {
+    "0점": 0,
+    "1점": 0,
+    "2점": 2,
+    "3점": 2,
+    "4점": 4,
+    "5점": 22
+  },
+  "by_type": {
+    "single_fact": {
+      "total": 13,
+      "passed": 13,
+      "pass_rate": 1.0,
+      "avg_score": 4.77
+    },
+    "region_specific": {
+      "total": 10,
+      "passed": 8,
+      "pass_rate": 0.8,
+      "avg_score": 4.3
+    },
+    "cross_reference": {
+      "total": 4,
+      "passed": 3,
+      "pass_rate": 0.75,
+      "avg_score": 4.0
+    },
+    "no_answer": {
+      "total": 3,
+      "passed": 2,
+      "pass_rate": 0.6667,
+      "avg_score": 5.0
+    }
+  },
+  "by_region": {
+    "seoul": {
+      "total": 17,
+      "passed": 16,
+      "pass_rate": 0.9412,
+      "avg_score": 4.65
+    },
+    "cheonan": {
+      "total": 3,
+      "passed": 3,
+      "pass_rate": 1.0,
+      "avg_score": 4.67
+    },
+    "busan_namgu": {
+      "total": 4,
+      "passed": 2,
+      "pass_rate": 0.5,
+      "avg_score": 4.25
+    },
+    "jeju": {
+      "total": 2,
+      "passed": 1,
+      "pass_rate": 0.5,
+      "avg_score": 4.0
+    },
+    "sejong": {
+      "total": 2,
+      "passed": 2,
+      "pass_rate": 1.0,
+      "avg_score": 5.0
+    },
+    "incheon_michuhol": {
+      "total": 2,
+      "passed": 2,
+      "pass_rate": 1.0,
+      "avg_score": 4.0
+    }
+  },
+  "failures": [
+    {
+      "id": "q014",
+      "type": "region_specific",
+      "region": "busan_namgu",
+      "question": "음식물쓰레기는 어떻게 버리나요?",
+      "reasons": [
+        "낮은 정확도 (2/5)"
+      ],
+      "score": 2,
+      "llm_reason": "음식물쓰레기 배출 방법에 대한 일부 정보는 포함되어 있으나, 지역적 특성과 전용용기 사용에 대한 중요한 내용이 누락됨.",
+      "answer_preview": "음식물쓰레기는 물기를 최대한 제거한 후 배출해야 하며, 소금 성분이 많은 김치, 된장, 고추장 등은 물에 헹구어 배출해야 합니다. 이물질인 비닐…"
+    },
+    {
+      "id": "q018",
+      "type": "region_specific",
+      "region": "jeju",
+      "question": "제주에서 음식물쓰레기 배출 방법은?",
+      "reasons": [
+        "환각",
+        "금지 키워드: ['전용봉투']"
+      ],
+      "score": 3,
+      "llm_reason": "음식물쓰레기 배출 방법에 대한 일부 정보는 포함되었으나, RFID 개별계량장비와 티머니 교통카드 사용에 대한 핵심 정보가 누락됨.",
+      "answer_preview": "제주에서 음식물쓰레기를 배출할 때는 물기를 최대한 제거한 후 배출해야 하며, 비닐봉지, 나무젓가락, 이쑤시개 등 이물질이 섞이지 않도록 주의해야…"
+    },
+    {
+      "id": "q024",
+      "type": "cross_reference",
+      "region": "seoul",
+      "question": "일회용 플라스틱컵 카페에서 써도 되나요?",
+      "reasons": [
+        "낮은 정확도 (2/5)"
+      ],
+      "score": 2,
+      "llm_reason": "일회용 플라스틱컵 사용에 대한 규제 정보가 누락되어 있으며, 중요한 내용이 포함되지 않음.",
+      "answer_preview": "일회용 플라스틱컵은 사용 후 폐기해야 하는 제품으로, 카페에서 사용하는 것은 가능합니다. 그러나 일회용컵 대신 텀블러를 반복 사용하면 온실가스와…"
+    },
+    {
+      "id": "q027",
+      "type": "no_answer",
+      "region": "busan_namgu",
+      "question": "대구 수성구 음식물쓰레기 배출 요일은 언제인가요?",
+      "reasons": [
+        "환각",
+        "금지 키워드: ['부산', '일요일', '화요일', '목요일']"
+      ],
+      "score": 5,
+      "llm_reason": "자료 없는 질문을 올바르게 거부",
+      "answer_preview": "제공된 자료에는 대구 수성구의 음식물쓰레기 배출 요일에 대한 정보가 포함되어 있지 않습니다. 부산 남구의 경우 매주 일요일, 화요일, 목요일에 …"
+    }
+  ]
+}

@@ -101,6 +101,13 @@ def grade(item: dict) -> dict:
     region 이 없는 문항은 전체 검색(지역 무관)으로 처리한다.
     """
     region = item.get("region")
+
+    # 검색 결과의 원문(content)을 contexts 로 저장해야 RAGAS 평가가 가능하다.
+    # rag_service.ask() 가 contexts 를 반환하지 않는 버전도 있으므로
+    # search() 를 별도로 호출해 확실히 가져온다.
+    search_results = rag_service.search(item["question"], owner_id=None, region=region, balanced=True)
+    contexts = [r["content"] for r in search_results if r.get("content")]
+
     result = rag_service.ask(item["question"], owner_id=None, region=region)
     answer = result.get("answer", "")
     tip = result.get("tip", "")
@@ -133,9 +140,12 @@ def grade(item: dict) -> dict:
         "type": item["type"],
         "region": region,
         "question": item["question"],
+        # RAGAS 등 후속 평가에서 재사용할 수 있게 모범답안도 남긴다
+        "reference_answer": item.get("reference_answer", ""),
         "answer": answer,
         "tip": tip,
         "sources": [s.get("title", "") for s in sources],
+        "contexts": contexts,
         "retrieval_hit": retrieval,
         "similarity": similarity,
         "missing_keywords": missing,

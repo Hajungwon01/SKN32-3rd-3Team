@@ -217,6 +217,7 @@ def ask(
             "tip": "",
             "source": "",
             "sources": [],
+            "contexts": [],
         }
 
     sections = _generate_answer(question, _build_context(results), history)
@@ -228,6 +229,9 @@ def ask(
         "tip": sections.get("tip", ""),
         "source": ", ".join(dict.fromkeys(s["title"] for s in source_list)),
         "sources": source_list,
+        # RAGAS 평가용 원문 청크.
+        # 라우터의 ChatResponse 가 걸러내므로 프론트 응답에는 포함되지 않는다.
+        "contexts": [r["content"] for r in results],
     }
 
 
