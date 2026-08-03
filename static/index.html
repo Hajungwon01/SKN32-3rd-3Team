@@ -83,6 +83,18 @@
               <span><span class="land-rdot" style="background:#D4890B"></span>부산 남구</span>
               <span class="land-region-go">바로가기 →</span>
             </div>
+            <div class="land-region" onclick="openGuide('region-incheon')">
+              <span><span class="land-rdot" style="background:#7B2D8B"></span>인천 미추홀구</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
+            <div class="land-region" onclick="openGuide('region-sejong')">
+              <span><span class="land-rdot" style="background:#D44B0B"></span>세종시</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
+            <div class="land-region" onclick="openGuide('region-jeju')">
+              <span><span class="land-rdot" style="background:#0B8BD4"></span>제주도</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
           </div>
         </div>
         <div class="land-card" id="land-info">
@@ -109,7 +121,7 @@
 
       <!-- 푸터 -->
       <footer class="land-footer">
-        <span>© 2025 Ecobot · 생활환경 실천 안내 서비스</span>
+        <span>© 2026 Ecobot · 생활환경 실천 안내 서비스</span>
         <div class="land-footer-links">
           <a href="#" onclick="event.preventDefault()">이용약관</a>
           <a href="#" onclick="event.preventDefault()">개인정보처리방침</a>
@@ -184,7 +196,8 @@
   <div id="chat-page" class="page">
     <div class="chat-layout">
       <!-- 사이드바 -->
-      <aside class="sidebar">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-resize-handle" id="sidebar-resize-handle"></div>
         <div class="sidebar-header">
           <div class="sidebar-logo" onclick="showPage('landing-page')" style="cursor:pointer" title="홈으로">
             <span class="logo-icon-sm">🌿</span>
@@ -201,10 +214,13 @@
             <option value="seoul">서울</option>
             <option value="cheonan">천안</option>
             <option value="busan_namgu">부산 남구</option>
+            <option value="incheon_michuhol">인천 미추홀구</option>
+            <option value="sejong">세종</option>
+            <option value="jeju">제주</option>
           </select>
         </div>
 
-        <div class="sidebar-section">
+        <div class="sidebar-section chat-section">
           <p class="sidebar-label">대화 목록</p>
           <div id="chat-list" class="chat-list">
             <!-- JS로 렌더링 -->
@@ -370,7 +386,7 @@
         <!-- JS로 렌더링 -->
       </div>
       <footer class="land-footer">
-        <span>© 2025 Ecobot · 생활환경 실천 안내 서비스</span>
+        <span>© 2026 Ecobot · 생활환경 실천 안내 서비스</span>
         <div class="land-footer-links">
           <a href="#" onclick="event.preventDefault()">이용약관</a>
           <a href="#" onclick="event.preventDefault()">개인정보처리방침</a>
@@ -407,7 +423,7 @@
           <div class="service-feat-card">
             <div class="service-feat-num">01</div>
             <h3>지역 맞춤 안내</h3>
-            <p>서울, 천안, 부산 남구 등 지역별로 다른 분리배출 기준과 수거 일정을 정확하게 안내합니다.</p>
+            <p>서울, 천안, 부산 남구, 인천 미추홀구, 세종, 제주 등 지역별로 다른 분리배출 기준과 수거 일정을 정확하게 안내합니다.</p>
           </div>
           <div class="service-feat-card">
             <div class="service-feat-num">02</div>
@@ -455,7 +471,7 @@
         </div>
       </div>
       <footer class="land-footer">
-        <span>© 2025 Ecobot · 생활환경 실천 안내 서비스</span>
+        <span>© 2026 Ecobot · 생활환경 실천 안내 서비스</span>
         <div class="land-footer-links">
           <a href="#" onclick="event.preventDefault()">이용약관</a>
           <a href="#" onclick="event.preventDefault()">개인정보처리방침</a>

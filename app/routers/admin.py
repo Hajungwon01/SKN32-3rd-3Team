@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.database import get_db
-from app.models import User, ChatLog
+from app.models import User, ChatLog, QuestionCluster
 from app.routers.api import get_current_user
 from app.services import vector_store_service, rag_service
 
@@ -88,14 +88,33 @@ def get_top_questions(
     user: User = Depends(_require_admin),
     db: Session = Depends(get_db),
 ):
-    rows = (
-        db.query(ChatLog.question, sql_func.count(ChatLog.id).label("cnt"))
-        .group_by(ChatLog.question)
-        .order_by(sql_func.count(ChatLog.id).desc())
-        .limit(limit)
+    """인기 질문 TOP N (클러스터가 있으면 유사 질문을 합산, 없으면 원문 기준)."""
+    # cluster_id가 있는 로그: 클러스터별로 합산
+    clustered = (
+        db.query(
+            QuestionCluster.representative,
+            sql_func.count(ChatLog.id).label("cnt"),
+        )
+        .join(QuestionCluster, ChatLog.cluster_id == QuestionCluster.id)
+        .filter(ChatLog.cluster_id.isnot(None))
+        .group_by(ChatLog.cluster_id)
         .all()
     )
-    return [{"question": r.question, "count": r.cnt} for r in rows]
+
+    # cluster_id가 없는 로그 (클러스터링 도입 전 데이터): 원문 기준
+    unclustered = (
+        db.query(ChatLog.question, sql_func.count(ChatLog.id).label("cnt"))
+        .filter(ChatLog.cluster_id.is_(None))
+        .group_by(ChatLog.question)
+        .all()
+    )
+
+    # 합쳐서 정렬
+    merged = [{"question": r.representative, "count": r.cnt} for r in clustered]
+    merged += [{"question": r.question, "count": r.cnt} for r in unclustered]
+    merged.sort(key=lambda x: x["count"], reverse=True)
+
+    return merged[:limit]
 
 
 # ─────────────────── 지역별 분포 ───────────────────
@@ -105,6 +124,9 @@ REGION_LABELS = {
     "seoul": "서울",
     "cheonan": "천안",
     "busan_namgu": "부산 남구",
+    "incheon_michuhol": "인천 미추홀구",
+    "sejong": "세종",
+    "jeju": "제주",
 }
 
 

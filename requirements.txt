@@ -22,10 +22,9 @@ faiss-cpu
 numpy
 pypdf
 
-# ── LLM / 임베딩 (Gemini) ──
+# ── LLM / 임베딩 ──
 google-genai
 openai
-
 sentence-transformers
 
 langchain-classic

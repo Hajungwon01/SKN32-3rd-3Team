@@ -87,9 +87,6 @@ class Settings(BaseSettings):
     # 법령 원문 txt 폴더 (시드 적재 스크립트가 읽는 곳)
     LAWS_DIR: Path = BASE_DIR / "data" / "laws"
 
-    # 기관 배출 가이드 폴더 (환경부·지자체 안내문)
-    GUIDES_DIR: Path = BASE_DIR / "data" / "guides"
-
     # 유사도 임계값. 이 점수 미만이면 근거 없음으로 보고 LLM을 호출하지 않는다.
     # (환각 방지 1차 장치)
     RAG_MIN_SCORE: float = 0.15
