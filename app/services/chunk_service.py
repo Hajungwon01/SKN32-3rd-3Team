@@ -11,13 +11,27 @@
   700자에서 기계적으로 자르면 조문 경계가 뭉개져서
   "자원순환법 제15조에 따라" 같은 정확한 인용이 불가능해진다.
   조문 하나 = 청크 하나로 만들면 검색 결과가 곧 인용 단위가 된다.
+
+[LangChain 도입 1단계 - 하정원]
+build_langchain_documents()를 파일 끝에 추가했다. build_chunks()(조문·품목
+단위 분할 로직)는 전혀 안 건드렸고, 그 결과를 LangChain의
+Document(page_content, metadata) 형태로 포장만 한다. 지금 당장 아무도
+이 함수를 안 부르니 위험 없음 - RAG 담당이 LangChain 벡터스토어로
+넘어갈 때 쓰면 된다.
 """
 
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 
 from app.core.config import settings
+
+if TYPE_CHECKING:
+    # 실행 시에는 무시됨 (langchain-core 없어도 이 파일은 정상 로딩됨).
+    # 에디터/타입체커가 build_langchain_documents()의 반환 타입을 알아볼
+    # 수 있게 하기 위한 용도일 뿐 - 실제 임포트는 함수 안에서 지연 임포트.
+    from langchain_core.documents import Document
 
 # "제15조(정의)", "제15조 (정의)", "제15조의2(...)" 앞에서 자르기 위한 패턴
 ARTICLE_SPLIT = re.compile(r"(?=제\s*\d+\s*조(?:의\s*\d+)?\s*[(（])")
@@ -221,3 +235,29 @@ def build_chunks(documents: list[dict]) -> list[dict]:
             )
 
     return chunks
+
+
+def build_langchain_documents(documents: list[dict]) -> list[Document]:
+    """build_chunks()와 완전히 같은 분할 로직(조문 단위·품목 단위)을 쓰되,
+    결과를 LangChain의 Document(page_content, metadata) 형태로 반환한다.
+
+    metadata에 넣는 키는 build_chunks()의 딕셔너리 키와 동일하게 맞췄다
+    (document_id, owner_id, title, source_type, region, chunk_index, label).
+    """
+    from langchain_core.documents import Document as _Document
+
+    return [
+        _Document(
+            page_content=chunk["content"],
+            metadata={
+                "document_id": chunk["document_id"],
+                "owner_id": chunk["owner_id"],
+                "title": chunk["title"],
+                "source_type": chunk["source_type"],
+                "region": chunk["region"],
+                "chunk_index": chunk["chunk_index"],
+                "label": chunk["label"],
+            },
+        )
+        for chunk in build_chunks(documents)
+    ]

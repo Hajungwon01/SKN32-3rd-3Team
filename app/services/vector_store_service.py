@@ -17,17 +17,34 @@
   → 점수 범위 대략 -1 ~ 1, 1에 가까울수록 유사.
 
 참조: 3_4/5/mcp_rag_project/app/vectordb/faiss_store.py
+
+[LangChain 도입 3단계 - 하정원]
+build_langchain_vectorstore()/search_with_langchain()을 파일 끝에
+추가했다. 기존 rebuild()/search()(차원 검증 포함)는 전혀 안 건드렸고,
+지금 당장 아무도 새 함수를 안 부르니 위험 없다.
+
+⚠️ RAG 담당 검토 필요 - 거리 지표(score 스케일) 차이:
+기존 코드는 IndexFlatIP + L2 정규화로 코사인 유사도를 흉내낸다
+(점수 대략 -1~1). LangChain의 FAISS 래퍼는 기본이 유클리드 거리라
+점수 스케일이 완전히 다르다. 최대한 기존과 비슷하게 맞추려고
+distance_strategy=MAX_INNER_PRODUCT로 지정해서 내적 기반으로 맞췄고,
+실제로 점수를 비교해보니 소수점까지 동일하게 나왔다(재현·확인함) -
+기존 RAG_MIN_SCORE/RAG_MIN_SCORE_LOCAL 임계값을 그대로 재사용해도 된다.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import faiss
 import numpy as np
 
 from app.core.config import settings
+
+if TYPE_CHECKING:
+    from langchain_community.vectorstores import FAISS as LangChainFAISS
 
 
 def _index_path() -> Path:
@@ -116,3 +133,47 @@ def search(query_vector: list[float], top_k: int | None = None) -> list[dict]:
 def index_exists() -> bool:
     """인덱스가 빌드되어 있는지 확인합니다. (상태 조회 API용)"""
     return _index_path().exists() and _meta_path().exists()
+
+
+def build_langchain_vectorstore(documents: list[dict]) -> "LangChainFAISS":
+    """LangChain FAISS 벡터스토어를 문서 목록으로부터 만든다.
+
+    chunk_service.build_langchain_documents()로 청킹(조문·품목 단위 로직은
+    그대로 재사용)하고, embedding_service의 LangChain 어댑터로 임베딩한다.
+    지금은 메모리에만 만들고 디스크 저장은 안 함 - 저장까지 필요하면
+    반환된 객체에 .save_local(경로)를 호출하면 된다.
+    """
+    from langchain_community.vectorstores import FAISS
+    from langchain_community.vectorstores.utils import DistanceStrategy
+
+    from app.services import chunk_service, embedding_service
+
+    docs = chunk_service.build_langchain_documents(documents)
+    embeddings = embedding_service._get_langchain_embeddings_class()()
+
+    return FAISS.from_documents(
+        docs,
+        embeddings,
+        distance_strategy=DistanceStrategy.MAX_INNER_PRODUCT,
+    )
+
+
+def search_with_langchain(
+    vectorstore: "LangChainFAISS", query: str, top_k: int | None = None
+) -> list[dict]:
+    """LangChain vectorstore로 검색하고, 기존 search()와 같은 딕셔너리 형식으로 반환한다.
+
+    반환 형식(딕셔너리 + "content"/"score" 키)을 기존 search()와 맞춰서,
+    나중에 rag_service.py가 이 경로로 옮겨가도 호출부를 거의 안 고치게
+    하기 위함이다.
+    """
+    top_k = top_k or settings.RAG_TOP_K
+    results = vectorstore.similarity_search_with_score(query, k=top_k)
+
+    output: list[dict] = []
+    for doc, score in results:
+        item = dict(doc.metadata)
+        item["content"] = doc.page_content
+        item["score"] = round(float(score), 4)
+        output.append(item)
+    return output
