@@ -30,6 +30,7 @@ class AuthUser(BaseModel):
     id: int
     email: EmailStr
     name: str
+    isAdmin: bool = False
 
 class DocumentSaveRequest(BaseModel):
     """생성/저장 둘 다 같은 모양. frontend/src/types/api.ts의 DocumentSaveRequest와 동일하게 맞췄다."""

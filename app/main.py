@@ -25,6 +25,100 @@ app = FastAPI(title="Ecobot")
 # (운영 전환 시에는 Alembic 같은 마이그레이션 도구로 교체할 것.)
 Base.metadata.create_all(bind=engine)
 
+# ─── 기존 테이블에 누락된 컬럼 추가 (간이 마이그레이션) ────────────────
+with engine.connect() as conn:
+    import sqlalchemy as _sa
+    # chat_logs.cluster_id 컬럼 추가
+    try:
+        conn.execute(_sa.text("SELECT cluster_id FROM chat_logs LIMIT 1"))
+    except Exception:
+        try:
+            conn.execute(_sa.text("ALTER TABLE chat_logs ADD COLUMN cluster_id INTEGER"))
+            conn.commit()
+            print("[DB] chat_logs.cluster_id 컬럼 추가 완료")
+        except Exception as e:
+            print(f"[DB] 컬럼 추가 실패: {e}")
+
+    # chat_messages.tip / sources 컬럼 추가
+    for col in ("tip", "sources"):
+        try:
+            conn.execute(_sa.text(f"SELECT {col} FROM chat_messages LIMIT 1"))
+        except Exception:
+            try:
+                conn.execute(_sa.text(f"ALTER TABLE chat_messages ADD COLUMN {col} TEXT"))
+                conn.commit()
+                print(f"[DB] chat_messages.{col} 컬럼 추가 완료")
+            except Exception as e:
+                print(f"[DB] 컬럼 추가 실패: {e}")
+
+    # 이전 source 컬럼이 있으면 sources로 이름 변경 (SQLite는 RENAME COLUMN 지원)
+    try:
+        conn.execute(_sa.text("SELECT source FROM chat_messages LIMIT 1"))
+        # source 컬럼이 존재하면 sources가 없을 때만 마이그레이션
+        try:
+            conn.execute(_sa.text("SELECT sources FROM chat_messages LIMIT 1"))
+        except Exception:
+            conn.execute(_sa.text("ALTER TABLE chat_messages RENAME COLUMN source TO sources"))
+            conn.commit()
+            print("[DB] chat_messages.source → sources 컬럼명 변경 완료")
+    except Exception:
+        pass  # source 컬럼 자체가 없으면 무시
+
+# ─── 서버 시작 시 기존 질문 클러스터 마이그레이션 ──────────────────────
+@app.on_event("startup")
+def _migrate_clusters():
+    """cluster_id가 없는 기존 ChatLog를 클러스터에 매칭한다."""
+    from app.database import get_db
+    from app.models import ChatLog, QuestionCluster
+    db = next(get_db())
+    try:
+        orphans = db.query(ChatLog).filter(ChatLog.cluster_id == None).all()
+        if not orphans:
+            return
+        print(f"[클러스터] 미매칭 질문 {len(orphans)}건 마이그레이션 시작")
+        from app.routers.rag import _assign_cluster
+        for log in orphans:
+            try:
+                cid = _assign_cluster(db, log.question)
+                log.cluster_id = cid
+            except Exception:
+                pass
+        db.commit()
+        print(f"[클러스터] 마이그레이션 완료")
+    except Exception as exc:
+        print(f"[클러스터] 마이그레이션 실패: {exc}")
+    finally:
+        db.close()
+
+
+# ─── 서버 시작 시 RAG 인덱스 자동 빌드 ─────────────────────────────────
+@app.on_event("startup")
+def _auto_rebuild_index():
+    """인덱스가 없거나 임베딩 차원이 변경되었으면 자동 재빌드한다."""
+    from app.services import vector_store_service, embedding_service, rag_service
+    import faiss as _faiss
+
+    idx_path = vector_store_service._index_path()
+    need_rebuild = False
+
+    if not vector_store_service.index_exists():
+        need_rebuild = True
+        print("[RAG] 인덱스가 없습니다. 자동 빌드를 시작합니다.")
+    else:
+        existing = _faiss.read_index(str(idx_path))
+        expected_dim = embedding_service.get_dimension()
+        if existing.d != expected_dim:
+            need_rebuild = True
+            print(f"[RAG] 인덱스 차원 불일치 ({existing.d} → {expected_dim}). 재빌드합니다.")
+
+    if need_rebuild:
+        try:
+            result = rag_service.rebuild_index()
+            print(f"[RAG] 자동 빌드 완료: {result}")
+        except Exception as exc:
+            print(f"[RAG] 자동 빌드 실패: {exc}")
+
+
 # ─── API 를 먼저 등록한다 ────────────────────────────────────────────
 # 아래 정적 마운트가 "/" 를 잡으므로, 순서가 바뀌면 /api 요청까지
 # 정적 파일 처리기가 가로채서 404가 난다. 이 순서는 습관으로 지킬 것.

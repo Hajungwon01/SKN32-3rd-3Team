@@ -109,6 +109,7 @@ function getDefaultResponse(region) {
 function showPage(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(pageId).classList.add('active');
+  sessionStorage.setItem('ecobot_last_page', pageId);
   if (pageId === 'admin-page') loadAdminDashboard();
 }
 
@@ -117,7 +118,7 @@ function goToStart() {
   if (currentUser) {
     showPage('chat-page');
   } else {
-    showPage('signup-page');
+    showPage('login-page');
   }
 }
 
@@ -233,19 +234,16 @@ function scrollToSection(e, id) {
 
 function goToChatWith(question, region) {
   if (!currentUser) {
-    // 로그인 안 된 상태면 로그인 페이지로 → 로그인 후 챗봇 진입
     sessionStorage.setItem('pendingQuestion', question);
     sessionStorage.setItem('pendingRegion', region);
     showPage('login-page');
     return;
   }
-  // 지역 설정
   const regionSelect = document.getElementById('region-select');
   if (region && regionSelect) {
     regionSelect.value = region;
   }
   showPage('chat-page');
-  // 질문이 있으면 자동 전송
   if (question) {
     setTimeout(() => {
       document.getElementById('chat-input').value = question;
@@ -259,54 +257,41 @@ document.getElementById('login-form').addEventListener('submit', async function(
   e.preventDefault();
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
+  if (!email || !password) return;
 
+  // ⚠️ 원래 여기가 완전 목업(이메일/비번만 있으면 무조건 통과, 백엔드 호출
+  // 없음)이었다. 챗봇 대화 저장이 쿠키 기반 인증에 의존하다 보니, 로그인이
+  // 가짜면 채팅 연결도 무의미해서 실제 API 호출로 같이 바꿨다.
+  // 이건 원래 프론트 담당(B) 영역이라 손댄 범위가 커진 것 - 내일 공유 필요.
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      alert(err.detail || '로그인에 실패했습니다.');
+      alert('로그인 실패: 이메일 또는 비밀번호를 확인해 주세요.');
       return;
     }
-    const data = await res.json();
+    const user = await res.json();  // {id, email, name}
     currentUser = {
-      email: data.email,
-      name: data.name || data.email.split('@')[0],
-      isAdmin: data.email.includes('admin'),
+      email: user.email,
+      name: user.name || user.email.split('@')[0],
+      isAdmin: !!user.isAdmin,
     };
     initChat();
-    applyPendingChat();
+    showPage('chat-page');
   } catch (err) {
+    console.error('로그인 요청 실패:', err);
     alert('서버에 연결할 수 없습니다.');
   }
 });
 
-function applyPendingChat() {
-  const pendingQ = sessionStorage.getItem('pendingQuestion');
-  const pendingR = sessionStorage.getItem('pendingRegion');
-  if (pendingR) {
-    const regionSelect = document.getElementById('region-select');
-    if (regionSelect) regionSelect.value = pendingR;
-  }
-  sessionStorage.removeItem('pendingQuestion');
-  sessionStorage.removeItem('pendingRegion');
-  showPage('chat-page');
-  if (pendingQ) {
-    setTimeout(() => {
-      document.getElementById('chat-input').value = pendingQ;
-      sendMessage();
-    }, 300);
-  }
-}
-
 document.getElementById('signup-form').addEventListener('submit', async function(e) {
   e.preventDefault();
-  const name = document.getElementById('signup-name')?.value || '';
-  const email = document.getElementById('signup-email').value;
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
   const password = document.getElementById('signup-password').value;
   const confirm = document.getElementById('signup-password-confirm').value;
 
@@ -319,10 +304,10 @@ document.getElementById('signup-form').addEventListener('submit', async function
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, display_name: name || email.split('@')[0] }),
+      body: JSON.stringify({ email, password, display_name: name }),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
+      const err = await res.json();
       alert(err.detail || '회원가입에 실패했습니다.');
       return;
     }
@@ -333,17 +318,43 @@ document.getElementById('signup-form').addEventListener('submit', async function
   }
 });
 
-async function logout() {
-  try {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-  } catch (_) {}
+function logout() {
+  fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
   currentUser = null;
   chatSessions = [];
   currentSessionId = null;
-  showPage('landing-page');
+  showPage('login-page');
 }
 
 // ===== Chat Init =====
+const DEFAULT_QUICK_QUESTIONS = [
+  '배달 용기 분리수거 어떻게 해?',
+  '페트병 라벨 꼭 떼야 해?',
+  '음식물쓰레기 배출 방법 알려줘',
+  '뼈다귀는 음식물쓰레기야?',
+];
+let quickQuestions = [...DEFAULT_QUICK_QUESTIONS];
+
+let _popularCache = null;
+
+async function fetchPopularQuestions() {
+  if (_popularCache) return _popularCache;
+  try {
+    const res = await fetch('/api/popular-questions?limit=5', { credentials: 'include' });
+    if (!res.ok) return [];
+    _popularCache = await res.json();
+    return _popularCache;
+  } catch (_) { return []; }
+}
+
+async function loadPopularQuestions() {
+  const data = await fetchPopularQuestions();
+  if (data.length >= 4) {
+    quickQuestions = data.slice(0, 4).map(d => d.question);
+    renderMessages();
+  }
+}
+
 function initChat() {
   if (!currentUser) return;
 
@@ -357,15 +368,59 @@ function initChat() {
     document.getElementById('admin-btn').style.display = 'block';
   }
 
-  // 첫 세션 생성
-  createNewSession();
+  // 대화 기록 복원 - 새로고침해도 이전 대화방들이 그대로 남아있도록.
+  restoreAllSessions();
+
+  // 인기 질문 로드
+  loadPopularQuestions();
+}
+
+async function restoreAllSessions() {
+  try {
+    const res = await fetch('/api/chat/sessions', { credentials: 'include' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const groups = await res.json();
+
+    if (!groups.length) {
+      createNewSession();
+      return;
+    }
+
+    chatSessions = groups.map(g => {
+      const firstUserMsg = g.messages.find(m => m.role === 'user');
+      const title = firstUserMsg
+        ? (firstUserMsg.content.length > 20 ? firstUserMsg.content.substring(0, 20) + '...' : firstUserMsg.content)
+        : '대화';
+      return {
+        id: g.session_id,
+        title,
+        region: g.region,
+        messages: g.messages.map(m => ({
+          role: m.role === 'user' ? 'user' : 'bot',
+          content: m.content,
+          tip: m.tip || '',
+          source: m.source || '',
+          sources: m.sources || [],
+        })),
+      };
+    });
+    currentSessionId = chatSessions[0].id;
+    document.getElementById('region-select').value = chatSessions[0].region;
+
+    renderChatList();
+    renderMessages();
+    updateRegionBadge();
+  } catch (err) {
+    console.error('대화 기록 복원 실패:', err);
+    createNewSession();
+  }
 }
 
 // ===== Sessions =====
 function createNewSession() {
   const region = document.getElementById('region-select').value;
   const session = {
-    id: Date.now(),
+    id: String(Date.now()),
     title: '새 대화',
     region: region,
     messages: []
@@ -410,10 +465,10 @@ function renderChatList() {
   const list = document.getElementById('chat-list');
   list.innerHTML = chatSessions.map(s => `
     <div class="chat-item ${s.id === currentSessionId ? 'active' : ''}"
-         onclick="switchSession(${s.id})">
+         onclick="switchSession('${s.id}')">
       <span class="chat-item-icon">💬</span>
       <span>${s.title}</span>
-      <button class="chat-item-delete" onclick="deleteSession(${s.id}, event)" title="삭제">✕</button>
+      <button class="chat-item-delete" onclick="deleteSession('${s.id}', event)" title="삭제">✕</button>
     </div>
   `).join('');
 }
@@ -444,10 +499,7 @@ function renderMessages() {
         <h3>Ecobot에 오신 것을 환영합니다</h3>
         <p>환경 실천에 관한 질문을 해보세요!</p>
         <div class="quick-questions">
-          <button class="quick-q" onclick="sendQuickQuestion('배달 용기 분리수거 어떻게 해?')">배달 용기 분리수거 어떻게 해?</button>
-          <button class="quick-q" onclick="sendQuickQuestion('페트병 라벨 꼭 떼야 해?')">페트병 라벨 꼭 떼야 해?</button>
-          <button class="quick-q" onclick="sendQuickQuestion('음식물쓰레기 배출 방법 알려줘')">음식물쓰레기 배출 방법 알려줘</button>
-          <button class="quick-q" onclick="sendQuickQuestion('뼈다귀는 음식물쓰레기야?')">뼈다귀는 음식물쓰레기야?</button>
+          ${quickQuestions.map(q => `<button class="quick-q" onclick="sendQuickQuestion('${q.replace(/'/g, "\\'")}')">${q}</button>`).join('')}
         </div>
       </div>`;
     return;
@@ -460,21 +512,45 @@ function renderMessages() {
           <div class="message-avatar">${currentUser.name[0].toUpperCase()}</div>
           <div class="message-content">${msg.content}</div>
         </div>`;
-    } else {
+    } else if (msg.content !== undefined) {
+      // 실제 백엔드(/api/chat) 응답 형식: {answer, tip, source, sources}
+      const tipHtml = msg.tip
+        ? `<div class="response-tip"><div class="tip-label"><span class="tip-icon">💡</span> 실천 팁</div><p>${msg.tip}</p></div>`
+        : '';
+      const sourceLabel = msg.source || (msg.sources && msg.sources.length
+        ? msg.sources.map(s => s.title).join(', ')
+        : '');
+      const sourcesHtml = sourceLabel ? `<div class="response-source">출처: ${sourceLabel}</div>` : '';
       return `
         <div class="message bot">
           <div class="message-avatar">🌿</div>
           <div class="message-content">
             <div class="response-answer">
               <div class="answer-label"><span class="answer-icon">📋</span> 답변</div>
-              <p>${msg.answer}</p>
+              <p>${msg.content}</p>
             </div>
-            ${msg.tip ? `
+            ${tipHtml}
+            ${sourcesHtml}
+          </div>
+        </div>`;
+    } else {
+      return `
+        <div class="message bot">
+          <div class="message-avatar">🌿</div>
+          <div class="message-content">
+            <div class="response-answer">
+              <div class="answer-label"><span class="answer-icon">📋</span> 가이드 근거</div>
+              <p>${msg.guide}</p>
+            </div>
+            <div class="response-answer">
+              <div class="answer-label"><span class="answer-icon">📄</span> 법률 근거</div>
+              <p>${msg.law}</p>
+            </div>
             <div class="response-tip">
               <div class="tip-label"><span class="tip-icon">💡</span> 실천 팁</div>
               <p>${msg.tip}</p>
-            </div>` : ''}
-            ${msg.source ? `<div class="response-source">출처: ${msg.source}</div>` : ''}
+            </div>
+            <div class="response-source">출처: ${msg.source}</div>
           </div>
         </div>`;
     }
@@ -491,13 +567,13 @@ function sendMessage() {
 
   addUserMessage(text);
   input.value = '';
-  fetchBotResponse(text);
+  askBackend(text);  // 대화 기록 저장/복원 기능 - 실제 백엔드 호출로 교체
 }
 
 function sendQuickQuestion(text) {
   if (isTyping) return;
   addUserMessage(text);
-  fetchBotResponse(text);
+  askBackend(text);
 }
 
 function addUserMessage(text) {
@@ -515,13 +591,10 @@ function addUserMessage(text) {
   renderMessages();
 }
 
-async function fetchBotResponse(question) {
+async function askBackend(question) {
   isTyping = true;
   const container = document.getElementById('chat-messages');
-  const session = chatSessions.find(s => s.id === currentSessionId);
-  if (!session) { isTyping = false; return; }
 
-  // 타이핑 인디케이터
   const typingDiv = document.createElement('div');
   typingDiv.className = 'message bot';
   typingDiv.id = 'typing-indicator';
@@ -537,40 +610,45 @@ async function fetchBotResponse(question) {
   container.appendChild(typingDiv);
   container.scrollTop = container.scrollHeight;
 
-  // region 매핑: 프론트의 'busan-namgu' → 백엔드의 'busan_namgu'
-  const regionMap = { 'busan-namgu': 'busan_namgu' };
-  const region = regionMap[session.region] || session.region;
+  const session = chatSessions.find(s => s.id === currentSessionId);
 
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ question, region }),
+      headers: { 'Content-Type': 'application/json' },
+      // 실제 ChatRequest 스키마: {question, region}. region-select 드롭다운 값을
+      // 그대로 보낸다 - 화면엔 이미 있던 드롭다운인데 원래 백엔드로 전달을
+      // 안 하고 있었음(목업이라 상관없었음). 이제 실제로 전달되게 연결.
+      body: JSON.stringify({
+        question,
+        region: session ? session.region : 'seoul',
+        session_id: session ? String(session.id) : null,
+      }),
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();  // {answer, tip, source, sources}
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || '답변 생성에 실패했습니다.');
+    if (session) {
+      session.messages.push({
+        role: 'bot',
+        content: data.answer,
+        tip: data.tip || '',
+        source: data.source || '',
+        sources: data.sources || [],
+      });
     }
-
-    const data = await res.json();
-    session.messages.push({
-      role: 'bot',
-      answer: data.answer || '',
-      tip: data.tip || '',
-      source: data.source || '',
-    });
   } catch (err) {
-    session.messages.push({
-      role: 'bot',
-      answer: `오류가 발생했습니다: ${err.message}`,
-      tip: '서버 상태를 확인하거나 잠시 후 다시 시도해 주세요.',
-      source: '',
-    });
+    console.error('챗봇 응답 실패:', err);
+    if (session) {
+      session.messages.push({
+        role: 'bot',
+        content: '답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        sources: [],
+      });
+    }
   }
 
-  // 타이핑 인디케이터 제거 후 렌더링
   const typing = document.getElementById('typing-indicator');
   if (typing) typing.remove();
 
@@ -596,16 +674,20 @@ function switchAdminTab(tabName) {
 
   document.querySelectorAll('.admin-content').forEach(c => c.classList.add('hidden'));
   document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+
+  if (tabName === 'documents') loadAdminDocuments();
 }
 
-// ===== Admin Dashboard Data =====
-const REGION_COLORS = ['#2D8B4E', '#3B7DD8', '#D4890B', '#8B5CF6', '#E5484D'];
-
+// ===== Admin Dashboard =====
 async function loadAdminDashboard() {
-  await Promise.all([loadStats(), loadRegionStats(), loadTopQuestions(), loadDailyTrend(), loadDocuments()]);
+  loadAdminStats();
+  loadAdminRegionStats();
+  loadAdminTopQuestions();
+  loadAdminDailyTrend();
+  loadAdminDocuments();
 }
 
-async function loadStats() {
+async function loadAdminStats() {
   try {
     const res = await fetch('/api/admin/stats', { credentials: 'include' });
     if (!res.ok) return;
@@ -614,215 +696,129 @@ async function loadStats() {
     document.getElementById('stat-today').textContent = d.today.toLocaleString();
     document.getElementById('stat-users').textContent = d.active_users.toLocaleString();
     document.getElementById('stat-success').textContent = d.success_rate + '%';
-
+    const diffEl = document.getElementById('stat-today-diff');
+    if (diffEl) {
+      const diff = d.today_diff;
+      diffEl.textContent = diff > 0 ? `+${diff} vs 어제` : diff < 0 ? `${diff} vs 어제` : '어제와 동일';
+    }
     const weekEl = document.getElementById('stat-week-change');
-    weekEl.textContent = (d.week_change >= 0 ? '+' : '') + d.week_change + '% vs 지난주';
-    if (d.week_change > 0) weekEl.classList.add('up');
-
-    const todayEl = document.getElementById('stat-today-diff');
-    const diff = d.today_diff;
-    todayEl.textContent = (diff >= 0 ? '+' : '') + diff + ' vs 어제';
-    if (diff > 0) todayEl.classList.add('up');
+    if (weekEl) {
+      const wc = d.week_change;
+      weekEl.textContent = wc > 0 ? `+${wc}% vs 지난주` : wc < 0 ? `${wc}% vs 지난주` : '지난주와 동일';
+    }
   } catch (_) {}
 }
 
-async function loadRegionStats() {
+async function loadAdminRegionStats() {
   try {
     const res = await fetch('/api/admin/region-stats', { credentials: 'include' });
     if (!res.ok) return;
     const data = await res.json();
     const container = document.getElementById('region-stats-container');
-
-    if (data.length === 0) {
-      container.innerHTML = '<p class="stat-placeholder">아직 질문 데이터가 없습니다.</p>';
-      return;
-    }
-
-    const maxCount = Math.max(...data.map(r => r.count));
-    container.innerHTML = data.map((r, i) => `
-      <div class="region-bar">
-        <span class="region-bar-label">${r.label}</span>
-        <div class="region-bar-track">
-          <div class="region-bar-fill" style="width: ${Math.round(r.count / maxCount * 100)}%; background: ${REGION_COLORS[i % REGION_COLORS.length]};"></div>
+    if (!data.length) { container.innerHTML = '<p class="stat-placeholder">질문 데이터가 없습니다.</p>'; return; }
+    const total = data.reduce((s, r) => s + r.count, 0);
+    const colors = ['#4A7C59', '#6B9E78', '#8FBC8F'];
+    container.innerHTML = data.map((r, i) => {
+      const pct = total > 0 ? Math.round(r.count / total * 100) : 0;
+      return `<div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px">
+          <span>${r.label}</span><span>${r.count}건 (${pct}%)</span>
         </div>
-        <span class="region-bar-value">${r.count}</span>
-      </div>
-    `).join('');
+        <div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${colors[i % colors.length]};border-radius:4px"></div>
+        </div>
+      </div>`;
+    }).join('');
   } catch (_) {}
 }
 
-async function loadTopQuestions() {
-  try {
-    const res = await fetch('/api/admin/top-questions?limit=5', { credentials: 'include' });
-    if (!res.ok) return;
-    const data = await res.json();
-    const container = document.getElementById('top-questions-container');
-
-    if (data.length === 0) {
-      container.innerHTML = '<p class="stat-placeholder">아직 질문 데이터가 없습니다.</p>';
-      return;
-    }
-
-    container.innerHTML = '<div class="top-questions-list">' + data.map((q, i) => `
-      <div class="top-question-item">
-        <span class="top-question-rank">${i + 1}</span>
-        <span class="top-question-text">${q.question.length > 25 ? q.question.substring(0, 25) + '...' : q.question}</span>
-        <span class="top-question-count">${q.count}</span>
-      </div>
-    `).join('') + '</div>';
-  } catch (_) {}
+async function loadAdminTopQuestions() {
+  const data = await fetchPopularQuestions();
+  const container = document.getElementById('top-questions-container');
+  if (!data.length) { container.innerHTML = '<p class="stat-placeholder">질문 데이터가 없습니다.</p>'; return; }
+  container.innerHTML = data.slice(0, 5).map((q, i) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px">
+      <span><strong>${i + 1}.</strong> ${q.question.length > 30 ? q.question.substring(0, 30) + '...' : q.question}</span>
+      <span style="color:#888;white-space:nowrap;margin-left:8px">${q.count}건</span>
+    </div>`
+  ).join('');
 }
 
-async function loadDailyTrend() {
+async function loadAdminDailyTrend() {
   try {
-    const res = await fetch('/api/admin/daily-trend', { credentials: 'include' });
+    const res = await fetch('/api/admin/daily-trend?days=7', { credentials: 'include' });
     if (!res.ok) return;
     const data = await res.json();
     const container = document.getElementById('daily-chart-container');
-
+    if (!data.length) { container.innerHTML = '<p class="stat-placeholder">데이터가 없습니다.</p>'; return; }
     const maxCount = Math.max(...data.map(d => d.count), 1);
-    container.innerHTML = '<div class="daily-bars">' + data.map((d, i) => {
-      const height = Math.max(4, Math.round(d.count / maxCount * 100));
-      const isToday = i === data.length - 1;
-      return `
-        <div class="daily-bar-col">
-          <span class="daily-bar-count">${d.count}</span>
-          <div class="daily-bar" style="height: ${height}px; opacity: ${isToday ? 1 : 0.5 + (i / data.length) * 0.4};"></div>
-          <span class="daily-bar-label ${isToday ? 'today' : ''}">${isToday ? '오늘' : d.day}</span>
+    container.innerHTML = `<div style="display:flex;align-items:flex-end;gap:12px;height:160px;padding:10px 0">
+      ${data.map(d => {
+        const h = Math.max(d.count / maxCount * 130, 4);
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+          <span style="font-size:11px;color:#666">${d.count}</span>
+          <div style="width:100%;max-width:40px;height:${h}px;background:#4A7C59;border-radius:4px 4px 0 0"></div>
+          <span style="font-size:11px;color:#888">${d.date}<br>${d.day}</span>
         </div>`;
-    }).join('') + '</div>';
+      }).join('')}
+    </div>`;
   } catch (_) {}
 }
 
-async function loadDocuments() {
+async function loadAdminDocuments() {
   try {
     const res = await fetch('/api/admin/documents', { credentials: 'include' });
     if (!res.ok) return;
     const data = await res.json();
-
-    // 인덱스 상태
     const statusEl = document.getElementById('index-status');
-    if (data.index_exists) {
-      statusEl.innerHTML = '<span class="index-dot active"></span><span>인덱스 상태: <strong>정상</strong> (' + data.total_chunks + ' chunks)</span>';
-    } else {
-      statusEl.innerHTML = '<span class="index-dot"></span><span>인덱스 상태: <strong>미생성</strong></span>';
+    if (statusEl) {
+      statusEl.innerHTML = data.index_exists
+        ? `<span class="index-dot" style="background:#4A7C59"></span><span>인덱스 활성 (${data.total_chunks}개 청크)</span>`
+        : `<span class="index-dot" style="background:#ccc"></span><span>인덱스 없음</span>`;
     }
-
-    // 문서 테이블
     const tbody = document.getElementById('doc-table-body');
-    if (data.documents.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="stat-placeholder">인덱싱된 문서가 없습니다.</td></tr>';
+    if (!data.documents || !data.documents.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="stat-placeholder">문서가 없습니다.</td></tr>';
       return;
     }
-    tbody.innerHTML = data.documents.map(d => `
-      <tr>
-        <td>${d.title}</td>
-        <td><span class="type-badge ${d.source_type}">${d.type_label}</span></td>
-        <td>${d.region_label}</td>
-        <td>${d.chunk_count}</td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = data.documents.map(d =>
+      `<tr><td>${d.title}</td><td>${d.type_label}</td><td>${d.region_label}</td><td>${d.chunk_count}</td></tr>`
+    ).join('');
   } catch (_) {}
 }
 
 async function rebuildIndex() {
-  const btn = event.target;
-  btn.disabled = true;
-  btn.textContent = '재빌드 중...';
+  if (!confirm('인덱스를 재빌드하시겠습니까?')) return;
   try {
     const res = await fetch('/api/rag/rebuild', { method: 'POST', credentials: 'include' });
+    if (!res.ok) throw new Error('재빌드 실패');
     const data = await res.json();
-    alert('인덱스 재빌드 완료: ' + data.indexed_chunks + ' chunks');
-    await loadDocuments();
+    alert(`인덱스 재빌드 완료 (${data.indexed_chunks || 0}개 청크)`);
+    loadAdminDocuments();
   } catch (err) {
-    alert('재빌드 실패: ' + err.message);
-  }
-  btn.disabled = false;
-  btn.textContent = '🔄 인덱스 재빌드';
-}
-
-// ===== File Upload =====
-async function handleFileUpload(input) {
-  const file = input.files[0];
-  if (!file) return;
-  await uploadFile(file);
-  input.value = '';
-}
-
-async function uploadFile(file) {
-  const allowed = ['.txt', '.md', '.pdf'];
-  const ext = '.' + file.name.split('.').pop().toLowerCase();
-  if (!allowed.includes(ext)) {
-    alert('허용되지 않는 파일 형식입니다. (.txt, .md, .pdf만 가능)');
-    return;
-  }
-
-  const progressEl = document.getElementById('upload-progress');
-  const barEl = document.getElementById('upload-progress-bar');
-  const textEl = document.getElementById('upload-progress-text');
-  progressEl.classList.remove('hidden');
-  barEl.style.width = '30%';
-  textEl.textContent = `"${file.name}" 업로드 중...`;
-
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    barEl.style.width = '60%';
-    const res = await fetch('/api/admin/upload', {
-      method: 'POST',
-      credentials: 'include',
-      body: formData,
-    });
-
-    barEl.style.width = '90%';
-    const data = await res.json();
-
-    if (!res.ok) {
-      textEl.textContent = '업로드 실패: ' + (data.detail || '알 수 없는 오류');
-      setTimeout(() => progressEl.classList.add('hidden'), 3000);
-      return;
-    }
-
-    barEl.style.width = '100%';
-    textEl.textContent = `"${data.filename}" 업로드 완료! (${data.indexed_chunks || 0} chunks)`;
-    await loadDocuments();
-    setTimeout(() => progressEl.classList.add('hidden'), 3000);
-  } catch (err) {
-    textEl.textContent = '업로드 실패: ' + err.message;
-    setTimeout(() => progressEl.classList.add('hidden'), 3000);
+    alert('인덱스 재빌드에 실패했습니다: ' + err.message);
   }
 }
-
-// Drag & Drop
-document.addEventListener('DOMContentLoaded', () => {
-  const area = document.getElementById('upload-area');
-  if (!area) return;
-
-  ['dragenter', 'dragover'].forEach(evt => {
-    area.addEventListener(evt, e => { e.preventDefault(); area.classList.add('drag-over'); });
-  });
-  ['dragleave', 'drop'].forEach(evt => {
-    area.addEventListener(evt, e => { e.preventDefault(); area.classList.remove('drag-over'); });
-  });
-  area.addEventListener('drop', e => {
-    const file = e.dataTransfer.files[0];
-    if (file) uploadFile(file);
-  });
-});
 
 // ===== 페이지 로드 시 세션 복원 =====
 (async function checkSession() {
   try {
     const res = await fetch('/api/me', { credentials: 'include' });
-    if (res.ok) {
-      const data = await res.json();
-      currentUser = {
-        email: data.email,
-        name: data.name || data.email.split('@')[0],
-        isAdmin: data.email.includes('admin'),
-      };
-      initChat();
+    if (!res.ok) return;  // 로그인 안 됨 → 랜딩 페이지 유지
+    const user = await res.json();
+    currentUser = {
+      email: user.email,
+      name: user.name || user.email.split('@')[0],
+      isAdmin: !!user.isAdmin,
+    };
+    initChat();
+    // 새로고침: sessionStorage에 저장된 마지막 페이지 복원
+    const lastPage = sessionStorage.getItem('ecobot_last_page');
+    if (lastPage && document.getElementById(lastPage)) {
+      showPage(lastPage);
+    } else {
+      // 서버 재시작(sessionStorage 없음): 랜딩 페이지
+      showPage('landing-page');
     }
   } catch (_) {}
 })();
