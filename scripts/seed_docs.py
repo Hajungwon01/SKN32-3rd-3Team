@@ -55,6 +55,11 @@ REGION_MAP = {
     "천안": "cheonan",
     "부산 남구": "busan_namgu",
     "부산남구": "busan_namgu",
+    "세종": "sejong",
+    "인천 미추홀구": "incheon_michuhol",
+    "인천미추홀구": "incheon_michuhol",
+    "미추홀": "incheon_michuhol",
+    "제주": "jeju",
 }
 
 
@@ -158,11 +163,36 @@ def load_public_docs() -> list[tuple[str, str, str]]:
     """법령·가이드 폴더를 모두 읽는다."""
     return (
         load_folder(settings.LAWS_DIR, "law")
-        + load_folder(settings.GUIDES_DIR, "guide")
+        + load_folder(settings.GUIDE_DIR, "guide")
     )
 
 
 # ─────────────────── 메인 ───────────────────
+
+
+def _remove_stale(db, owner: User, current_titles: set[str]) -> None:
+    """폴더에서 사라진 문서를 DB에서도 지운다.
+
+    파일을 삭제해도 DB 행은 남기 때문에, 정리하지 않으면
+      - 없앤 문서가 계속 검색되고
+      - 파일명을 바꿨을 때 같은 내용이 두 문서로 중복 인덱싱된다.
+    시드가 넣은 공용 문서(law·guide)만 대상으로 하며 사용자 문서는 건드리지 않는다.
+    """
+    stale = [
+        doc
+        for doc in db.query(Document)
+        .filter(
+            Document.owner_id == owner.id,
+            Document.source_type.in_([SourceType.law, SourceType.guide]),
+        )
+        .all()
+        if doc.title not in current_titles
+    ]
+
+    for doc in stale:
+        kind = getattr(doc.source_type, "value", doc.source_type)
+        print(f"  삭제: [{kind}] {doc.title}")
+        db.delete(doc)
 
 
 def main() -> None:
@@ -172,7 +202,7 @@ def main() -> None:
     docs = load_public_docs()
 
     if not docs:
-        print(f"[중단] {settings.LAWS_DIR} 와 {settings.GUIDES_DIR} 에 파일이 없습니다.")
+        print(f"[중단] {settings.LAWS_DIR} 와 {settings.GUIDE_DIR} 에 파일이 없습니다.")
         print("       txt·md·pdf 를 넣은 뒤 다시 실행하세요.")
         return
 
@@ -212,6 +242,7 @@ def main() -> None:
             region_label = f" [{region}]" if region else ""
             print(f"  {action}: [{source_type}]{region_label} {title}")
 
+        _remove_stale(db, owner, {title for title, _, _ in docs})
         db.commit()
 
     print("\n[3/3] 인덱스 재생성")
