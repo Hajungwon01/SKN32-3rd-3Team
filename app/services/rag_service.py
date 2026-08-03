@@ -313,9 +313,7 @@ def _extract_region(filename: str) -> str:
 def _load_from_files() -> list[dict]:
     """data/guide + data/docs 폴더에서 문서를 읽는다. (RAG_SOURCE=files, DB 없이 테스트용)
 
-    ⚠️ settings.GUIDE_DIR / settings.DOCS_DIR 를 참조하는데, 하정원 쪽
-    config.py에는 GUIDES_DIR(복수형)로 되어 있다. 이름이 다르면
-    RAG_SOURCE=files 모드에서 AttributeError로 죽을 수 있음 - 확인 필요.
+    settings.GUIDE_DIR / settings.DOCS_DIR / settings.LAWS_DIR 를 참조한다.
     """
     supported = {".txt", ".md", ".pdf"}
     documents: list[dict] = []

@@ -184,7 +184,8 @@
   <div id="chat-page" class="page">
     <div class="chat-layout">
       <!-- 사이드바 -->
-      <aside class="sidebar">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-resize-handle" id="sidebar-resize-handle"></div>
         <div class="sidebar-header">
           <div class="sidebar-logo" onclick="showPage('landing-page')" style="cursor:pointer" title="홈으로">
             <span class="logo-icon-sm">🌿</span>
@@ -200,11 +201,11 @@
           <select id="region-select" class="region-dropdown">
             <option value="seoul">서울</option>
             <option value="cheonan">천안</option>
-            <option value="busan-namgu">부산 남구</option>
+            <option value="busan_namgu">부산 남구</option>
           </select>
         </div>
 
-        <div class="sidebar-section">
+        <div class="sidebar-section chat-section">
           <p class="sidebar-label">대화 목록</p>
           <div id="chat-list" class="chat-list">
             <!-- JS로 렌더링 -->

@@ -156,10 +156,7 @@ def load_folder(folder, source_type: str) -> list[tuple[str, str, str]]:
 
 def load_public_docs() -> list[tuple[str, str, str]]:
     """법령·가이드 폴더를 모두 읽는다."""
-    return (
-        load_folder(settings.LAWS_DIR, "law")
-        + load_folder(settings.GUIDES_DIR, "guide")
-    )
+    return load_folder(settings.LAWS_DIR, "law")
 
 
 # ─────────────────── 메인 ───────────────────
@@ -172,7 +169,7 @@ def main() -> None:
     docs = load_public_docs()
 
     if not docs:
-        print(f"[중단] {settings.LAWS_DIR} 와 {settings.GUIDES_DIR} 에 파일이 없습니다.")
+        print(f"[중단] {settings.LAWS_DIR} 에 파일이 없습니다.")
         print("       txt·md·pdf 를 넣은 뒤 다시 실행하세요.")
         return
 

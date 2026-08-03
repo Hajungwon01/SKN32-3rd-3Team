@@ -8,7 +8,7 @@ let isTyping = false;
 const REGION_LABELS = {
   'seoul': '서울',
   'cheonan': '천안',
-  'busan-namgu': '부산 남구'
+  'busan_namgu': '부산 남구'
 };
 
 const DEMO_RESPONSES = {
@@ -25,7 +25,7 @@ const DEMO_RESPONSES = {
       tip: '천안시는 아파트와 단독주택의 배출일이 다를 수 있으니, 관할 주민센터에 확인하세요. 깨끗이 씻은 용기만 재활용됩니다.',
       source: '환경부 분리배출 가이드, 천안시 폐기물 관리 조례'
     },
-    'busan-namgu': {
+    'busan_namgu': {
       guide: '배달 용기는 내용물을 비우고 헹군 뒤 재질별로 분리배출합니다. 부산 남구는 요일별 배출제를 시행하며, 플라스틱류는 수요일에 배출합니다. 스티로폼 용기는 이물질 제거 후 별도 배출하세요.',
       law: '자원순환법 제15조 및 부산광역시 남구 폐기물 관리 조례에 의거하여 재활용품 분리배출 의무가 부과됩니다.',
       tip: '부산 남구 클린하우스를 이용하면 24시간 배출 가능합니다. 남구청 홈페이지에서 요일별 배출 품목을 확인하세요.',
@@ -45,7 +45,7 @@ const DEMO_RESPONSES = {
       tip: '천안시 공동주택은 투명 페트병 전용 수거함이 별도로 비치되어 있습니다. 단독주택은 투명 봉투에 담아 배출하세요.',
       source: '환경부 분리배출 가이드, 천안시 재활용 안내'
     },
-    'busan-namgu': {
+    'busan_namgu': {
       guide: '네, 라벨 제거는 필수입니다. 부산 남구에서는 투명 페트병을 일반 플라스틱과 분리하여 별도 배출합니다. 라벨을 떼고 압착 후 뚜껑을 닫아주세요.',
       law: '자원순환법 시행규칙 및 부산시 조례에 따라 투명 페트병 별도 분리배출이 의무화되어 있습니다.',
       tip: '부산 남구 클린하우스에 투명 페트병 전용 수거함이 있습니다. 색깔 있는 페트병은 일반 플라스틱으로 배출하세요.',
@@ -65,7 +65,7 @@ const DEMO_RESPONSES = {
       tip: '천안시 음식물쓰레기 봉투는 읍면동 주민센터, 대형마트, 편의점에서 구매할 수 있습니다. 물기를 짜서 배출하면 봉투 절약에 도움이 됩니다.',
       source: '천안시 환경과, 음식물류 폐기물 관리법'
     },
-    'busan-namgu': {
+    'busan_namgu': {
       guide: '부산 남구는 납부필증 방식으로 음식물쓰레기를 배출합니다. 전용 용기에 납부필증을 부착하여 배출하세요. 배출 시간은 일몰 후~자정이며, 공동주택은 단지 내 전용 수거 용기를 이용합니다.',
       law: '음식물류 폐기물 관리법 및 부산광역시 남구 조례에 따라 납부필증 부착 배출이 의무입니다.',
       tip: '남구청에서 음식물쓰레기 감량기 보급 사업을 진행하고 있으니 신청해 보세요. 가정용 감량기를 사용하면 배출량을 70%까지 줄일 수 있습니다.',
@@ -85,7 +85,7 @@ const DEMO_RESPONSES = {
       tip: '천안시 음식물쓰레기 비해당 품목: 뼈, 달걀/메추리알 껍데기, 조개/전복 껍데기, 견과류 껍질, 옥수수 껍질 등은 모두 일반쓰레기입니다.',
       source: '환경부 분리배출 가이드, 천안시 환경과'
     },
-    'busan-namgu': {
+    'busan_namgu': {
       guide: '뼈다귀는 음식물쓰레기가 아닙니다. 부산 남구에서도 일반쓰레기 종량제 봉투로 배출하세요. 뼈, 껍데기류는 사료화·퇴비화가 불가능하여 음식물쓰레기에서 제외됩니다.',
       law: '환경부 음식물류 폐기물 관리 고시에 따라 동물의 뼈는 음식물쓰레기 분류에서 제외됩니다.',
       tip: '부산 남구 주민을 위한 꿀팁: 남구청 홈페이지에서 음식물쓰레기 분류 가이드 PDF를 다운받을 수 있습니다. 냉장고에 붙여두면 편리해요!',
@@ -821,4 +821,35 @@ async function rebuildIndex() {
       showPage('landing-page');
     }
   } catch (_) {}
+})();
+
+// ===== 사이드바 리사이즈 =====
+(function initSidebarResize() {
+  const handle = document.getElementById('sidebar-resize-handle');
+  const sidebar = document.getElementById('sidebar');
+  if (!handle || !sidebar) return;
+
+  let dragging = false;
+
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    dragging = true;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const newWidth = Math.min(500, Math.max(200, e.clientX));
+    sidebar.style.width = newWidth + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
 })();
