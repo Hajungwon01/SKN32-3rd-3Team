@@ -24,3 +24,6 @@ pypdf
 
 # ── LLM / 임베딩 (Gemini) ──
 google-genai
+openai
+
+sentence-transformers

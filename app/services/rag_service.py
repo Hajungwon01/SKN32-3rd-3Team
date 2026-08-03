@@ -13,10 +13,20 @@
 공용 문서:
   법령(source_type="law")은 소유자와 무관하게 모든 사용자가 검색할 수 있다.
   개인 문서는 본인 것만 검색된다.
+
+[대화 기록/흐름 유지 기능 - 하정원]
+ask()에 history 파라미터를 추가했다 (기존 서명·반환 형식은 그대로 유지).
+history=None이면 기존과 완전히 동일하게 동작한다.
+⚠️ 이 파일의 guide/law/tip 구조화(_generate_answer의 반환 형식)가 아직
+   진행 중인 것 같다 - docstring은 {"guide","law","tip"}인데 실제 fallback은
+   {"answer","tip"}을 반환하고 ask()는 sections.get("answer")를 씀. 어느 쪽이
+   최종 형태인지 확인 필요 (내일 논의). history 연결은 어느 쪽이 되든
+   깨지지 않게 방어적으로 짜뒀다.
 """
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from app.core.config import settings
@@ -35,13 +45,19 @@ NO_ANSWER = "관련 자료를 찾을 수 없습니다"
 def _effective_min_score(min_score: float | None) -> float:
     """유사도 임계값을 결정한다.
 
-    local 임베딩은 해시 기반이라 점수 스케일이 gemini 와 다르다.
-    (local 0.05~0.15 / gemini 0.5~0.8 수준)
-    같은 임계값을 쓰면 local 에서는 모든 결과가 걸러지므로 분리한다.
+    백엔드마다 점수 스케일이 다르므로 같은 임계값을 쓸 수 없다.
+      - hash   : 표면 문자열 일치만 잡아 0.05~0.15 수준 → 전용 임계값 사용
+      - local  : sentence-transformers. 의미 기반이라 점수대가 높다
+      - gemini : 0.3~0.7 수준
+      - openai : 0.2~0.6 수준
+
+    hash 를 제외한 나머지는 RAG_MIN_SCORE 를 쓰되,
+    **백엔드를 바꾸면 scripts/measure_threshold.py 로 재측정해야 한다.**
+    (모델마다 유사도 분포가 달라 같은 값이 맞지 않는다)
     """
     if min_score is not None:
         return min_score
-    if settings.EMBEDDING_BACKEND.lower() == "local":
+    if settings.EMBEDDING_BACKEND.lower() == "hash":
         return settings.RAG_MIN_SCORE_LOCAL
     return settings.RAG_MIN_SCORE
 
@@ -78,20 +94,30 @@ def search(
     owner_id: int | None = None,
     min_score: float | None = None,
     region: str | None = None,
+    balanced: bool = False,
 ) -> list[dict]:
     """질문과 유사한 청크를 점수 순으로 반환한다.
 
     owner_id 를 넘기면 "본인 문서 + 공용 법령"만 남긴다.
     region 을 넘기면 "해당 지역 + common(공통)" 문서만 남긴다.
     min_score 미만인 결과는 근거로 삼기에 부족하다고 보고 제외한다.
+
+    balanced=True 면 문서 종류별 자리를 배분한다. (답변 생성용)
+    이때 개수는 top_k 가 아니라 RAG_TOP_K_GUIDE + RAG_TOP_K_LAW 로 정해진다.
+    balanced=False 면 순수 유사도 순으로 top_k 개를 반환한다. (검색 품질 진단용)
     """
     top_k = top_k or settings.RAG_TOP_K
     min_score = _effective_min_score(min_score)
 
     query_vector = embedding_service.embed_query(query)
 
-    # 필터링 후에도 top_k 개를 채우기 위해 넉넉히 검색한 뒤 잘라낸다.
-    fetch_k = top_k * 5 if (owner_id is not None or region) else top_k * 2
+    # 소유자·지역·종류 필터를 거친 뒤에도 개수를 채우려면 넉넉히 가져와야 한다.
+    fetch_k = max(
+        top_k,
+        settings.RAG_TOP_K_REGION
+        + settings.RAG_TOP_K_COMMON
+        + settings.RAG_TOP_K_LAW,
+    ) * 25
     results = vector_store_service.search(query_vector, fetch_k)
 
     if owner_id is not None:
@@ -101,17 +127,69 @@ def search(
             or r.get("source_type") in PUBLIC_SOURCE_TYPES
         ]
 
-    # 지역 필터: 해당 지역 + common(공통) 문서만 남긴다
+    # 지역 필터: 해당 지역 + 전국 공통 문서만 남긴다.
+    # region 이 None 인 청크는 전국 공통으로 간주한다.
+    # (예전 인덱스나 region 컬럼이 비어 있는 문서를 통째로 잃지 않기 위함)
     if region:
         results = [
             r for r in results
-            if r.get("region") in (region, "common")
+            if r.get("region") in (region, "common", None)
         ]
 
     # 유사도 임계값 (환각 방지 1차 장치)
     results = [r for r in results if r.get("score", 0.0) >= min_score]
 
+    if balanced:
+        return _apply_quota(results, region)
+
     return results[:top_k]
+
+
+def _apply_quota(results: list[dict], region: str | None = None) -> list[dict]:
+    """문서 종류별 자리를 배분해 지역·공통·법령이 함께 잡히도록 한다.
+
+    자리를 나누는 이유
+      법령은 조문 수가 많아(수백 개) 청크 비중에서 가이드를 압도한다.
+      또 전국 공통 가이드(에너지·탄소중립·일회용품 등)가 늘어나면
+      가이드 자리를 공통이 모두 차지해 정작 필요한 지역 문서가 밀려난다.
+      실제로 "쓰레기 몇 시에 내놔요?" 질문에서 부산 배출시간 청크가
+      검색 결과에 들어오지 못하는 문제가 있었다.
+
+    그래서 지역 전용 / 전국 공통 / 법령에 각각 자리를 보장한다.
+    한 그룹이 자리를 못 채우면 남은 자리는 다른 그룹으로 넘겨 낭비하지 않는다.
+
+    region 이 없으면(전체 검색) 지역 구분이 무의미하므로
+    가이드 전체를 하나로 묶어 배분한다.
+    """
+    law_quota = settings.RAG_TOP_K_LAW
+    if law_quota <= 0 and settings.RAG_TOP_K_REGION <= 0:
+        return results
+
+    laws = [r for r in results if r.get("source_type") == "law"]
+    guides = [r for r in results if r.get("source_type") != "law"]
+
+    if region:
+        region_quota = settings.RAG_TOP_K_REGION
+        common_quota = settings.RAG_TOP_K_COMMON
+
+        # 선택한 지역 전용 문서와 전국 공통 문서를 나눈다
+        local = [r for r in guides if r.get("region") == region]
+        common = [r for r in guides if r.get("region") != region]
+
+        picked = local[:region_quota] + common[:common_quota] + laws[:law_quota]
+        total = region_quota + common_quota + law_quota
+    else:
+        guide_quota = settings.RAG_TOP_K_GUIDE
+        picked = guides[:guide_quota] + laws[:law_quota]
+        total = guide_quota + law_quota
+
+    # 남은 자리를 다른 그룹에서 채운다
+    if len(picked) < total:
+        chosen = {id(r) for r in picked}
+        picked += [r for r in results if id(r) not in chosen][: total - len(picked)]
+
+    # 중요한 근거가 앞에 오도록 점수 순으로 정렬해 반환
+    return sorted(picked, key=lambda r: r.get("score", 0.0), reverse=True)
 
 
 def ask(
@@ -119,14 +197,18 @@ def ask(
     top_k: int | None = None,
     owner_id: int | None = None,
     region: str | None = None,
+    history: list[dict] | None = None,
 ) -> dict:
     """검색된 문맥을 근거로 3섹션 답변을 생성한다.
 
     반환 형식:
         {"guide": str, "law": str, "tip": str, "source": str,
          "sources": [{"document_id": int, "title": str, "snippet": str}, ...]}
+
+    history: [{"role": "user"|"assistant", "content": str}, ...] (오래된 순).
+        "대화 흐름 유지" 기능용 - None이면 기존과 완전히 동일하게 동작.
     """
-    results = search(question, top_k, owner_id, region=region)
+    results = search(question, top_k, owner_id, region=region, balanced=True)
 
     # 근거가 없으면 LLM을 호출하지 않는다. (환각 방지)
     if not results:
@@ -137,13 +219,14 @@ def ask(
             "sources": [],
         }
 
-    sections = _generate_answer(question, _build_context(results))
+    sections = _generate_answer(question, _build_context(results), history)
     source_list = _build_sources(results)
 
     return {
-        "answer": sections.get("answer", ""),
+        "answer": sections.get("answer", "") or sections.get("guide", ""),
+        "law": sections.get("law", ""),
         "tip": sections.get("tip", ""),
-        "source": ", ".join(s["title"] for s in source_list),
+        "source": ", ".join(dict.fromkeys(s["title"] for s in source_list)),
         "sources": source_list,
     }
 
@@ -169,8 +252,6 @@ def _build_context(results: list[dict]) -> str:
     laws: list[str] = []
 
     for item in results:
-        # 청크 본문이 이미 "제8조(…)" 또는 "[품목별 요령 > 종이류]" 로 시작하므로
-        # 여기서는 문서 제목만 붙인다. (라벨을 또 쓰면 중복된다)
         block = f"[{item.get('title', '제목 없음')}]\n{item['content']}"
         (laws if item.get("source_type") == "law" else guides).append(block)
 
@@ -183,33 +264,37 @@ def _build_context(results: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
+# 문서 분류용 접두사만 제거 대상. 지역명 대괄호는 남겨야 한다.
+_TAG_PREFIX = re.compile(r"^\[(가이드|법령|샘플)\]_?\s*")
+
+
 def _clean_title(raw_title: str) -> str:
     """파일명 형태의 제목을 사람이 읽기 좋은 형태로 정리한다.
 
     예) [가이드]_환경부_공통_분리배출_기준 → 환경부 공통 분리배출 기준
-        [법령]_자원순환법 → 자원순환법
+        폐기물관리법_시행규칙              → 폐기물관리법 시행규칙
+
+    주의: "[서울시] 분리배출 요령" 처럼 대괄호에 지역명이 담긴 제목은
+    그대로 둔다. 지우면 답변 출처에서 어느 지역 기준인지 알 수 없게 되고,
+    평가에서도 어느 지역 문서가 검색됐는지 판별할 수 없다.
     """
-    import re
-    title = re.sub(r"^\[.*?\]_?", "", raw_title)  # [가이드]_ 등 접두사 제거
-    title = title.replace("_", " ")                # 언더스코어 → 공백
+    title = _TAG_PREFIX.sub("", raw_title)   # [가이드]_ 등 분류 접두사만 제거
+    title = title.replace("_", " ")          # 언더스코어 → 공백
     return title.strip() or raw_title
 
 
 def _build_sources(results: list[dict]) -> list[dict]:
-    """검색 결과를 프론트 ChatSource 형식으로 변환한다.
-
-    같은 문서라도 조문이 다르면 별개 근거이므로 (document_id, article) 단위로 묶는다.
-    """
+    """검색 결과를 프론트 ChatSource 형식으로 변환한다."""
     sources: list[dict] = []
     seen: set = set()
 
     for item in results:
-        key = (item.get("document_id"), item.get("label"))
-        if key in seen:
+        cleaned = _clean_title(item.get("title", "제목 없음"))
+        if cleaned in seen:
             continue
-        seen.add(key)
+        seen.add(cleaned)
 
-        snippet = " ".join(item["content"].split())  # 줄바꿈·중복 공백 정리
+        snippet = " ".join(item["content"].split())
         if len(snippet) > SNIPPET_LENGTH:
             snippet = snippet[:SNIPPET_LENGTH] + "…"
 
@@ -235,11 +320,7 @@ def _load_documents(db=None) -> list[dict]:
 
 
 def _load_from_db(db=None) -> list[dict]:
-    """documents 테이블에서 문서를 읽는다. (RAG_SOURCE=db)
-
-    content_text(평문) → content → summary 순으로 채워진 값을 사용한다.
-    프론트가 content 에 에디터 JSON을 저장하므로 평문인 content_text 가 우선이다.
-    """
+    """documents 테이블에서 문서를 읽는다. (RAG_SOURCE=db)"""
     from app.database import SessionLocal
     from app.models import Document
 
@@ -255,8 +336,6 @@ def _load_from_db(db=None) -> list[dict]:
                 row.content,
                 row.summary,
             ]
-            # content 와 content_text 가 같은 값인 경우가 흔하므로 중복을 제거한다.
-            # (제거하지 않으면 같은 내용이 두 번 인덱싱되어 검색 결과가 중복된다)
             parts: list[str] = []
             for candidate in candidates:
                 if not (isinstance(candidate, str) and candidate.strip()):
@@ -268,7 +347,6 @@ def _load_from_db(db=None) -> list[dict]:
                 continue
 
             source_type = row.source_type
-            # SQLAlchemy Enum 이면 .value, 문자열이면 그대로
             source_type = getattr(source_type, "value", source_type)
 
             documents.append(
@@ -276,9 +354,14 @@ def _load_from_db(db=None) -> list[dict]:
                     "id": row.id,
                     "owner_id": row.owner_id,
                     "title": row.title,
-                    # 법령은 조문 단위 분할을 위해 평문 하나만 쓴다
                     "content": parts[0] if source_type == "law" else "\n\n".join(parts),
                     "source_type": source_type,
+                    # 하정원 쪽 seed_docs.py는 region을 "지역: xxx" 줄에서
+                    # 읽어 None/문자열로 저장한다. 이 파일의 _extract_region()은
+                    # 파일명 기준으로 "common" 문자열을 쓰는 등 방식이 서로
+                    # 달라서, 실제 documents.region 컬럼 값을 그대로 전달한다
+                    # (getattr로 방어 - region 컬럼이 없는 이전 상태에서도 안 죽게).
+                    "region": getattr(row, "region", None),
                 }
             )
 
@@ -292,18 +375,16 @@ def _load_from_db(db=None) -> list[dict]:
 
 
 def _extract_region(filename: str) -> str:
-    """파일명에서 지역 코드를 추출한다.
-
-    예) [가이드]_서울시_... → seoul
-        [가이드]_천안시_... → cheonan
-        [가이드]_부산남구_... → busan_namgu
-        [가이드]_환경부_공통_... → common
-    """
+    """파일명에서 지역 코드를 추출한다."""
     REGION_MAP = {
         "서울": "seoul",
         "천안": "cheonan",
         "부산남구": "busan_namgu",
         "부산": "busan_namgu",
+        "세종": "sejong",
+        "인천미추홀구": "incheon_michuhol",
+        "미추홀": "incheon_michuhol",
+        "제주": "jeju",
         "공통": "common",
         "환경부": "common",
     }
@@ -316,14 +397,14 @@ def _extract_region(filename: str) -> str:
 def _load_from_files() -> list[dict]:
     """data/guide + data/docs 폴더에서 문서를 읽는다. (RAG_SOURCE=files, DB 없이 테스트용)
 
-    파일명이 '[법령]' 으로 시작하면 법령으로 간주해 조문 단위로 청킹한다.
-    파일명이 '[가이드]' 로 시작하면 guide 유형으로, 지역명을 추출해 region을 설정한다.
+    ⚠️ settings.GUIDE_DIR / settings.DOCS_DIR 를 참조하는데, 하정원 쪽
+    config.py에는 GUIDES_DIR(복수형)로 되어 있다. 이름이 다르면
+    RAG_SOURCE=files 모드에서 AttributeError로 죽을 수 있음 - 확인 필요.
     """
     supported = {".txt", ".md", ".pdf"}
     documents: list[dict] = []
 
-    # data/guide 와 data/docs 두 폴더를 모두 탐색
-    search_dirs = [settings.GUIDE_DIR, settings.DOCS_DIR]
+    search_dirs = [settings.GUIDE_DIR, settings.DOCS_DIR, settings.LAWS_DIR]
 
     doc_id = 0
     for folder in search_dirs:
@@ -340,10 +421,10 @@ def _load_from_files() -> list[dict]:
             doc_id += 1
             stem = path.stem
 
-            # source_type 결정
-            if stem.startswith("[법령]"):
+            # 폴더 기반 source_type 자동 태깅
+            if folder == settings.LAWS_DIR or stem.startswith("[법령]"):
                 source_type = "law"
-            elif stem.startswith("[가이드]"):
+            elif folder == settings.GUIDE_DIR or stem.startswith("[가이드]"):
                 source_type = "guide"
             else:
                 source_type = "manual"
@@ -376,7 +457,6 @@ def _read_file(path: Path) -> str:
             return ""
         return "\n".join(p.extract_text() or "" for p in PdfReader(str(path)).pages)
 
-    # Windows 메모장으로 저장한 파일은 cp949 인 경우가 있어 대비
     try:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
@@ -386,19 +466,24 @@ def _read_file(path: Path) -> str:
 # ─────────────────── 답변 생성 ───────────────────
 
 
-def _generate_answer(question: str, context: str) -> dict:
-    """컨텍스트를 근거로 3섹션 답변을 생성한다.
+def _generate_answer(question: str, context: str, history: list[dict] | None = None) -> dict:
+    """컨텍스트를 근거로 답변을 생성한다.
 
     gemini_service.answer_with_context() 가 있으면 사용하고,
     없으면 검색된 원문을 그대로 보여주는 대체 답변을 반환한다.
 
-    반환: {"guide": str, "law": str, "tip": str}
+    history는 "흐름 유지" 기능용으로 추가한 파라미터다. gemini_service가
+    아직 history를 안 받는 구버전이면 TypeError가 나므로, 그 경우 history
+    없이 재호출해서 하위 호환을 지킨다.
     """
     try:
         from app.services import gemini_service
 
         if hasattr(gemini_service, "answer_with_context"):
-            return gemini_service.answer_with_context(question, context)
+            try:
+                return gemini_service.answer_with_context(question, context, history=history)
+            except TypeError:
+                return gemini_service.answer_with_context(question, context)
     except ImportError:
         pass
 

@@ -1,13 +1,14 @@
 """
-Gemini 연동.
+LLM 연동 (Gemini / OpenAI 전환 가능).
 
-- generate_summary(prompt) : 문서 요약 (기존 · 요약 담당)
-- answer_with_context(...)  : RAG 답변 생성 (RAG 파트 추가)
+- generate_summary(prompt) : 문서 요약
+- answer_with_context(...)  : RAG 답변 생성
 
-google-genai 패키지가 없거나 GEMINI_API_KEY 가 비어 있으면
-예외를 던지지 않고 안내 문구를 돌려준다. 팀원이 키 없이도 서버를 띄울 수 있어야 하기 때문.
+.env의 LLM_BACKEND 값으로 백엔드 전환:
+  - "gemini" : Google Gemini API (기본)
+  - "openai" : OpenAI API
 
-    pip install google-genai
+    pip install google-genai openai
 """
 
 from app.core.config import settings
@@ -17,7 +18,15 @@ from app.core.config import settings
 
 
 def _generate(prompt: str) -> str | None:
-    """Gemini 를 호출한다. 사용할 수 없는 상태면 None 을 돌려준다."""
+    """LLM_BACKEND에 따라 Gemini 또는 OpenAI를 호출한다."""
+    backend = settings.LLM_BACKEND.lower()
+    if backend == "openai":
+        return _generate_openai(prompt)
+    return _generate_gemini(prompt)
+
+
+def _generate_gemini(prompt: str) -> str | None:
+    """Gemini를 호출한다."""
     if not settings.GEMINI_API_KEY:
         return None
 
@@ -34,8 +43,40 @@ def _generate(prompt: str) -> str | None:
             contents=prompt,
         )
         return (response.text or "").strip() or None
-    except Exception as exc:  # 네트워크·할당량·모델명 오류 등
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "429" in msg or "quota" in msg or "rate" in msg or "resource exhausted" in msg:
+            print(f"[Gemini] API 할당량 초과: {exc}")
+            return "__QUOTA_EXCEEDED__"
         print(f"[Gemini] 호출 실패: {exc}")
+        return None
+
+
+def _generate_openai(prompt: str) -> str | None:
+    """OpenAI를 호출한다."""
+    if not settings.OPENAI_API_KEY:
+        return None
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        print("[OpenAI] openai 패키지가 설치되지 않았습니다.  pip install openai")
+        return None
+
+    try:
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model=settings.OPENAI_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+        )
+        return (response.choices[0].message.content or "").strip() or None
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "429" in msg or "quota" in msg or "rate" in msg:
+            print(f"[OpenAI] API 할당량 초과: {exc}")
+            return "__QUOTA_EXCEEDED__"
+        print(f"[OpenAI] 호출 실패: {exc}")
         return None
 
 
@@ -63,6 +104,20 @@ ANSWER_PROMPT = """당신은 환경·분리배출 관련 상담 도우미 'Ecobo
 1. 근거에 없는 내용은 절대 추측하거나 지어내지 마세요.
 2. 근거만으로 답할 수 없으면 "관련 정보를 찾을 수 없습니다."라고만 적으세요.
 3. 태그 바깥에는 아무 텍스트도 쓰지 마세요.
+4. [이전 대화]가 있다면 참고해서 자연스럽게 이어 답하되, 이전 대화 내용 자체를
+   근거로 새로운 사실을 지어내지 마세요 (사실 판단은 항상 [근거]만 기준).
+5. **근거의 대괄호 섹션 제목을 반드시 확인하고 그 분류를 따르세요.**
+   "일반쓰레기로 배출해야 하는 음식물" 같은 하위 제목에 있는 품목은
+   그 분류(일반쓰레기)로 답해야 합니다.
+   상위 제목("음식물쓰레기 배출 요령")만 보고 반대로 해석하면 안 됩니다.
+6. **법령명과 조문 번호는 [근거]에 실제로 등장한 것만 인용하세요.**
+   근거에 없는 법령명이나 조문 번호를 기억이나 추측으로 쓰면 안 됩니다.
+   근거에 조문 번호가 없으면 법령을 인용하지 말고 가이드 내용만으로 답하세요.
+7. **질문의 대상(품목·지역)이 근거의 대상과 다르면 적용하지 마세요.**
+   비슷해 보여도 다른 품목이면 "관련 정보를 찾을 수 없습니다."라고 답해야 합니다.
+   (예: 보조배터리·폐건전지 배출 안내를 전기차 폐배터리에 적용 금지)
+8. 질문한 품목의 **일반적인 처리 방법을 먼저** 설명하고, 예외 사항은 그다음에 덧붙이세요.
+   예외만 설명하고 일반 방법을 빠뜨리면 안 됩니다.
 
 --- 예시 ---
 [근거]
@@ -74,7 +129,7 @@ ANSWER_PROMPT = """당신은 환경·분리배출 관련 상담 도우미 'Ecobo
 <tip>라벨 절취선이 있으면 쉽게 뗄 수 있어요. 절취선이 없으면 가위로 한 번만 자르면 쉽게 벗겨집니다.</tip>
 
 --- 실제 질문 ---
-[근거]
+{history_block}[근거]
 {context}
 
 [질문] {question}
@@ -94,16 +149,43 @@ def _parse_sections(text: str) -> dict:
     return sections
 
 
-def answer_with_context(question: str, context: str) -> dict:
+def _format_history(history: list[dict] | None) -> str:
+    """이전 대화를 프롬프트에 넣을 블록으로 변환. 없으면 빈 문자열(기존과 동일)."""
+    if not history:
+        return ""
+    lines = [
+        f"{'사용자' if turn.get('role') == 'user' else '챗봇'}: {turn.get('content', '')}"
+        for turn in history
+    ]
+    return "[이전 대화]\n" + "\n".join(lines) + "\n\n"
+
+
+def answer_with_context(question: str, context: str, history: list[dict] | None = None) -> dict:
     """검색된 문서를 근거로 2섹션 답변을 생성한다. (rag_service 가 호출)
 
     반환: {"answer": str, "tip": str}
+
+    history: 최근 대화 목록. "대화 흐름 유지" 기능용으로 추가한 파라미터라
+    안 넘기면(None) 기존과 완전히 동일하게 동작한다(하위 호환).
     """
-    result = _generate(ANSWER_PROMPT.format(context=context, question=question))
+    history_block = _format_history(history)
+    prompt = ANSWER_PROMPT.format(history_block=history_block, context=context, question=question)
+    result = _generate(prompt)
+
+    if result == "__QUOTA_EXCEEDED__":
+        return {
+            "answer": "현재 API 사용량이 초과되었습니다. 잠시 후 다시 질문해 주세요.",
+            "tip": "",
+        }
 
     if result is None:
+        backend = settings.LLM_BACKEND.lower()
+        if backend == "openai":
+            msg = "[LLM 미연결] OPENAI_API_KEY 설정 후 다시 질문하세요."
+        else:
+            msg = "[LLM 미연결] GEMINI_API_KEY 설정 후 다시 질문하세요."
         return {
-            "answer": "[LLM 미연결] GEMINI_API_KEY 설정 후 다시 질문하세요.",
+            "answer": msg,
             "tip": "",
         }
 
