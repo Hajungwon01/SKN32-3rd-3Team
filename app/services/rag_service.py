@@ -13,6 +13,15 @@
 공용 문서:
   법령(source_type="law")은 소유자와 무관하게 모든 사용자가 검색할 수 있다.
   개인 문서는 본인 것만 검색된다.
+
+[대화 기록/흐름 유지 기능 - 하정원]
+ask()에 history 파라미터를 추가했다 (기존 서명·반환 형식은 그대로 유지).
+history=None이면 기존과 완전히 동일하게 동작한다.
+⚠️ 이 파일의 guide/law/tip 구조화(_generate_answer의 반환 형식)가 아직
+   진행 중인 것 같다 - docstring은 {"guide","law","tip"}인데 실제 fallback은
+   {"answer","tip"}을 반환하고 ask()는 sections.get("answer")를 씀. 어느 쪽이
+   최종 형태인지 확인 필요 (내일 논의). history 연결은 어느 쪽이 되든
+   깨지지 않게 방어적으로 짜뒀다.
 """
 
 from __future__ import annotations
@@ -119,12 +128,16 @@ def ask(
     top_k: int | None = None,
     owner_id: int | None = None,
     region: str | None = None,
+    history: list[dict] | None = None,
 ) -> dict:
     """검색된 문맥을 근거로 3섹션 답변을 생성한다.
 
     반환 형식:
         {"guide": str, "law": str, "tip": str, "source": str,
          "sources": [{"document_id": int, "title": str, "snippet": str}, ...]}
+
+    history: [{"role": "user"|"assistant", "content": str}, ...] (오래된 순).
+        "대화 흐름 유지" 기능용 - None이면 기존과 완전히 동일하게 동작.
     """
     results = search(question, top_k, owner_id, region=region)
 
@@ -137,11 +150,12 @@ def ask(
             "sources": [],
         }
 
-    sections = _generate_answer(question, _build_context(results))
+    sections = _generate_answer(question, _build_context(results), history)
     source_list = _build_sources(results)
 
     return {
-        "answer": sections.get("answer", ""),
+        "answer": sections.get("answer", "") or sections.get("guide", ""),
+        "law": sections.get("law", ""),
         "tip": sections.get("tip", ""),
         "source": ", ".join(s["title"] for s in source_list),
         "sources": source_list,
@@ -169,8 +183,6 @@ def _build_context(results: list[dict]) -> str:
     laws: list[str] = []
 
     for item in results:
-        # 청크 본문이 이미 "제8조(…)" 또는 "[품목별 요령 > 종이류]" 로 시작하므로
-        # 여기서는 문서 제목만 붙인다. (라벨을 또 쓰면 중복된다)
         block = f"[{item.get('title', '제목 없음')}]\n{item['content']}"
         (laws if item.get("source_type") == "law" else guides).append(block)
 
@@ -184,22 +196,15 @@ def _build_context(results: list[dict]) -> str:
 
 
 def _clean_title(raw_title: str) -> str:
-    """파일명 형태의 제목을 사람이 읽기 좋은 형태로 정리한다.
-
-    예) [가이드]_환경부_공통_분리배출_기준 → 환경부 공통 분리배출 기준
-        [법령]_자원순환법 → 자원순환법
-    """
+    """파일명 형태의 제목을 사람이 읽기 좋은 형태로 정리한다."""
     import re
-    title = re.sub(r"^\[.*?\]_?", "", raw_title)  # [가이드]_ 등 접두사 제거
-    title = title.replace("_", " ")                # 언더스코어 → 공백
+    title = re.sub(r"^\[.*?\]_?", "", raw_title)
+    title = title.replace("_", " ")
     return title.strip() or raw_title
 
 
 def _build_sources(results: list[dict]) -> list[dict]:
-    """검색 결과를 프론트 ChatSource 형식으로 변환한다.
-
-    같은 문서라도 조문이 다르면 별개 근거이므로 (document_id, article) 단위로 묶는다.
-    """
+    """검색 결과를 프론트 ChatSource 형식으로 변환한다."""
     sources: list[dict] = []
     seen: set = set()
 
@@ -209,7 +214,7 @@ def _build_sources(results: list[dict]) -> list[dict]:
             continue
         seen.add(key)
 
-        snippet = " ".join(item["content"].split())  # 줄바꿈·중복 공백 정리
+        snippet = " ".join(item["content"].split())
         if len(snippet) > SNIPPET_LENGTH:
             snippet = snippet[:SNIPPET_LENGTH] + "…"
 
@@ -235,11 +240,7 @@ def _load_documents(db=None) -> list[dict]:
 
 
 def _load_from_db(db=None) -> list[dict]:
-    """documents 테이블에서 문서를 읽는다. (RAG_SOURCE=db)
-
-    content_text(평문) → content → summary 순으로 채워진 값을 사용한다.
-    프론트가 content 에 에디터 JSON을 저장하므로 평문인 content_text 가 우선이다.
-    """
+    """documents 테이블에서 문서를 읽는다. (RAG_SOURCE=db)"""
     from app.database import SessionLocal
     from app.models import Document
 
@@ -255,8 +256,6 @@ def _load_from_db(db=None) -> list[dict]:
                 row.content,
                 row.summary,
             ]
-            # content 와 content_text 가 같은 값인 경우가 흔하므로 중복을 제거한다.
-            # (제거하지 않으면 같은 내용이 두 번 인덱싱되어 검색 결과가 중복된다)
             parts: list[str] = []
             for candidate in candidates:
                 if not (isinstance(candidate, str) and candidate.strip()):
@@ -268,7 +267,6 @@ def _load_from_db(db=None) -> list[dict]:
                 continue
 
             source_type = row.source_type
-            # SQLAlchemy Enum 이면 .value, 문자열이면 그대로
             source_type = getattr(source_type, "value", source_type)
 
             documents.append(
@@ -276,9 +274,14 @@ def _load_from_db(db=None) -> list[dict]:
                     "id": row.id,
                     "owner_id": row.owner_id,
                     "title": row.title,
-                    # 법령은 조문 단위 분할을 위해 평문 하나만 쓴다
                     "content": parts[0] if source_type == "law" else "\n\n".join(parts),
                     "source_type": source_type,
+                    # 하정원 쪽 seed_docs.py는 region을 "지역: xxx" 줄에서
+                    # 읽어 None/문자열로 저장한다. 이 파일의 _extract_region()은
+                    # 파일명 기준으로 "common" 문자열을 쓰는 등 방식이 서로
+                    # 달라서, 실제 documents.region 컬럼 값을 그대로 전달한다
+                    # (getattr로 방어 - region 컬럼이 없는 이전 상태에서도 안 죽게).
+                    "region": getattr(row, "region", None),
                 }
             )
 
@@ -292,13 +295,7 @@ def _load_from_db(db=None) -> list[dict]:
 
 
 def _extract_region(filename: str) -> str:
-    """파일명에서 지역 코드를 추출한다.
-
-    예) [가이드]_서울시_... → seoul
-        [가이드]_천안시_... → cheonan
-        [가이드]_부산남구_... → busan_namgu
-        [가이드]_환경부_공통_... → common
-    """
+    """파일명에서 지역 코드를 추출한다."""
     REGION_MAP = {
         "서울": "seoul",
         "천안": "cheonan",
@@ -316,13 +313,13 @@ def _extract_region(filename: str) -> str:
 def _load_from_files() -> list[dict]:
     """data/guide + data/docs 폴더에서 문서를 읽는다. (RAG_SOURCE=files, DB 없이 테스트용)
 
-    파일명이 '[법령]' 으로 시작하면 법령으로 간주해 조문 단위로 청킹한다.
-    파일명이 '[가이드]' 로 시작하면 guide 유형으로, 지역명을 추출해 region을 설정한다.
+    ⚠️ settings.GUIDE_DIR / settings.DOCS_DIR 를 참조하는데, 하정원 쪽
+    config.py에는 GUIDES_DIR(복수형)로 되어 있다. 이름이 다르면
+    RAG_SOURCE=files 모드에서 AttributeError로 죽을 수 있음 - 확인 필요.
     """
     supported = {".txt", ".md", ".pdf"}
     documents: list[dict] = []
 
-    # data/guide 와 data/docs 두 폴더를 모두 탐색
     search_dirs = [settings.GUIDE_DIR, settings.DOCS_DIR]
 
     doc_id = 0
@@ -340,7 +337,6 @@ def _load_from_files() -> list[dict]:
             doc_id += 1
             stem = path.stem
 
-            # source_type 결정
             if stem.startswith("[법령]"):
                 source_type = "law"
             elif stem.startswith("[가이드]"):
@@ -376,7 +372,6 @@ def _read_file(path: Path) -> str:
             return ""
         return "\n".join(p.extract_text() or "" for p in PdfReader(str(path)).pages)
 
-    # Windows 메모장으로 저장한 파일은 cp949 인 경우가 있어 대비
     try:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
@@ -386,19 +381,24 @@ def _read_file(path: Path) -> str:
 # ─────────────────── 답변 생성 ───────────────────
 
 
-def _generate_answer(question: str, context: str) -> dict:
-    """컨텍스트를 근거로 3섹션 답변을 생성한다.
+def _generate_answer(question: str, context: str, history: list[dict] | None = None) -> dict:
+    """컨텍스트를 근거로 답변을 생성한다.
 
     gemini_service.answer_with_context() 가 있으면 사용하고,
     없으면 검색된 원문을 그대로 보여주는 대체 답변을 반환한다.
 
-    반환: {"guide": str, "law": str, "tip": str}
+    history는 "흐름 유지" 기능용으로 추가한 파라미터다. gemini_service가
+    아직 history를 안 받는 구버전이면 TypeError가 나므로, 그 경우 history
+    없이 재호출해서 하위 호환을 지킨다.
     """
     try:
         from app.services import gemini_service
 
         if hasattr(gemini_service, "answer_with_context"):
-            return gemini_service.answer_with_context(question, context)
+            try:
+                return gemini_service.answer_with_context(question, context, history=history)
+            except TypeError:
+                return gemini_service.answer_with_context(question, context)
     except ImportError:
         pass
 

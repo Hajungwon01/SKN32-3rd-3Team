@@ -16,6 +16,13 @@
 문서 제목
   파일 첫 줄이 "[" 로 시작하면 그 줄을 제목으로 쓰고, 아니면 파일명을 쓴다.
   답변에서 "서울시 기준으로는…" 처럼 인용되므로 지역이 드러나는 제목이 좋다.
+
+[지역(region) 채우기 - 하정원 추가]
+제목의 "[지역명]" 부분에서 region 코드를 뽑아 documents.region 에 채운다.
+⚠️ RAG 담당의 rag_service.py에도 파일명 기준 _extract_region()이 별도로
+   있는데, 그건 문자열 값으로 "common"을 쓰고 여기는 None을 쓴다 - 방식이
+   달라서 통일이 필요할 수 있음 (내일 논의). 지금은 documents 테이블에
+   실제 값을 채우는 게 우선이라 일단 이 방식으로 진행.
 """
 
 from __future__ import annotations
@@ -40,6 +47,15 @@ SUPPORTED = (".txt", ".md", ".pdf")
 
 # 폴더 안내문 등 자료가 아닌 파일은 제외한다
 IGNORED_STEMS = {"readme", "read_me", "notes", "메모"}
+
+# 제목의 "[지역명]"에서 region 코드로 매핑. 여기 없는 지역(예: [환경부 공통])이나
+# 법령은 None(=전국 공통)으로 남는다.
+REGION_MAP = {
+    "서울": "seoul",
+    "천안": "cheonan",
+    "부산 남구": "busan_namgu",
+    "부산남구": "busan_namgu",
+}
 
 
 # ─────────────────── 계정 ───────────────────
@@ -90,6 +106,14 @@ def _extract_title(text: str, fallback: str) -> str:
     return fallback
 
 
+def _extract_region(title: str) -> str | None:
+    """제목의 [지역명]에서 region 코드를 추출한다. 전국 공통/매칭 없으면 None."""
+    for keyword, code in REGION_MAP.items():
+        if keyword in title:
+            return code
+    return None
+
+
 def load_folder(folder, source_type: str) -> list[tuple[str, str, str]]:
     """폴더의 문서를 (제목, 본문, source_type) 목록으로 읽는다."""
     folder.mkdir(parents=True, exist_ok=True)
@@ -121,7 +145,9 @@ def load_folder(folder, source_type: str) -> list[tuple[str, str, str]]:
             else:
                 print(f"  법령  : {title} — 조문 {articles}개, {len(text):,}자")
         else:
-            print(f"  가이드: {title} — {len(text):,}자")
+            region = _extract_region(title)
+            region_label = region or "전국 공통"
+            print(f"  가이드: {title} — {len(text):,}자 (지역: {region_label})")
 
         items.append((title, text, source_type))
 
@@ -156,6 +182,8 @@ def main() -> None:
         get_or_create_user(db, DEMO_EMAIL, DEMO_PASSWORD, "데모 사용자")
 
         for title, content, source_type in docs:
+            region = _extract_region(title)
+
             doc = (
                 db.query(Document)
                 .filter(Document.title == title, Document.owner_id == owner.id)
@@ -166,6 +194,7 @@ def main() -> None:
                 doc.content = content
                 doc.content_text = content
                 doc.source_type = SourceType(source_type)
+                doc.region = region
                 action = "갱신"
             else:
                 db.add(
@@ -175,11 +204,13 @@ def main() -> None:
                         content=content,
                         content_text=content,
                         source_type=SourceType(source_type),
+                        region=region,
                     )
                 )
                 action = "추가"
 
-            print(f"  {action}: [{source_type}] {title}")
+            region_label = f" [{region}]" if region else ""
+            print(f"  {action}: [{source_type}]{region_label} {title}")
 
         db.commit()
 
