@@ -10,6 +10,20 @@
 
 인터페이스는 embed_documents / embed_query 두 개로 고정.
 백엔드를 바꿔도 호출하는 쪽(rag_service)은 수정할 필요가 없습니다.
+
+[LangChain 도입 2단계 - 하정원]
+_get_langchain_embeddings_class()를 파일 끝에 추가했다. 기존
+embed_documents/embed_query(캐시 포함)는 전혀 안 건드렸고, 그 함수들에
+그대로 위임하는 LangChain Embeddings 어댑터만 얹었다. 지금 당장 아무도
+이 함수를 안 부르니 위험 없음.
+
+⚠️ 처음엔 별도 클래스를 만들어서 Embeddings를 상속 안 하고 같은 이름의
+메서드만 구현해서 의존을 줄이려 했는데, 실제로 LangChain의 FAISS가
+내부에서 isinstance(embedding_function, Embeddings)로 검사해서 "object
+is not callable" 에러가 났다 (재현·확인함). 상속이 필수였다. 그런데
+믹스인으로 다중 상속하면 Embeddings가 Pydantic 기반이라 MRO가 꼬여
+"Can't instantiate abstract class" 에러가 또 났다 (역시 재현·확인함).
+그래서 함수 안에서 단일 클래스로 직접 상속하는 방식으로 정리했다.
 """
 
 from __future__ import annotations
@@ -258,3 +272,25 @@ def _embed_openai(texts: list[str]) -> list[list[float]]:
         print(f"    임베딩 {min(start + batch_size, total)}/{total}")
 
     return vectors
+
+
+# ─────────────── LangChain 어댑터 (LangChain 도입 2단계, 하정원 추가) ───────────────
+
+
+def _get_langchain_embeddings_class():
+    """langchain_core.embeddings.Embeddings를 상속한 어댑터 클래스를 반환한다.
+
+    LangChain의 벡터스토어(FAISS 등)가 요구하는 embed_documents/embed_query를
+    위의 기존 함수(캐시 포함)에 그대로 위임한다. 백엔드 전환
+    (local/gemini/openai/hash) 로직은 하나도 새로 안 만들고 재사용한다.
+    """
+    from langchain_core.embeddings import Embeddings
+
+    class _LangChainEmbeddingsImpl(Embeddings):
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            return embed_documents(texts)
+
+        def embed_query(self, text: str) -> list[float]:
+            return embed_query(text)
+
+    return _LangChainEmbeddingsImpl

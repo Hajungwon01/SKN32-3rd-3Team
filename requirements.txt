@@ -26,3 +26,12 @@ pypdf
 google-genai
 openai
 sentence-transformers
+
+langchain-classic
+langchain-community<0.4
+langchain-core
+langchain-google-genai
+langchain-openai
+langchain-protocol
+langchain-text-splitters
+langsmith

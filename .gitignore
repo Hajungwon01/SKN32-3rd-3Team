@@ -28,6 +28,7 @@ __pycache__/
 # DB 파일만 콕 집어서 무시한다.
 /data/*.db
 /data/*.sqlite3
+/test.db
 
 # ── 일부러 커밋하는 것 ──
 # app/static/   빌드 산출물. 팀원이 Node 없이 uvicorn 하나로 화면을 보게 하려고.
