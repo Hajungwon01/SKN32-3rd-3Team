@@ -254,7 +254,7 @@ def _assign_cluster(db: Session, question: str) -> int | None:
     import numpy as np
     from app.services import embedding_service
 
-    SIMILARITY_THRESHOLD = 0.85
+    SIMILARITY_THRESHOLD = 0.92
 
     try:
         vec = embedding_service.embed_documents([question])[0]

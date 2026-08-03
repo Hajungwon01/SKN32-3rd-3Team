@@ -8,7 +8,10 @@ let isTyping = false;
 const REGION_LABELS = {
   'seoul': '서울',
   'cheonan': '천안',
-  'busan_namgu': '부산 남구'
+  'busan_namgu': '부산 남구',
+  'incheon_michuhol': '인천 미추홀구',
+  'sejong': '세종',
+  'jeju': '제주',
 };
 
 const DEMO_RESPONSES = {
@@ -190,6 +193,39 @@ const GUIDE_DATA = {
       { heading: '문의', items: ['부산 남구 자원순환과: 051-607-4471', '부산 남구청 홈페이지 > 분리배출 안내'] },
     ]
   },
+  'region-incheon': {
+    title: '인천 미추홀구 분리배출 가이드',
+    icon: '#7B2D8B',
+    color: '#F3E8FB',
+    sections: [
+      { heading: '미추홀구 분리배출 특징', items: ['요일별 배출제 시행 (재활용: 수·토)', '투명 페트병 별도 분리배출 의무화', '대형 폐기물 인터넷 신고제 운영'] },
+      { heading: '품목별 요령', items: ['비닐류: 이물질 제거 후 투명 봉투에 모아 배출', '스티로폼: 테이프·운송장 제거 후 배출', '폐형광등·폐건전지: 주민센터·아파트 전용수거함 배출', '투명 페트병: 라벨 제거 후 찌그러뜨려 별도 배출'] },
+      { heading: '배출 시간', items: ['재활용: 수요일·토요일 저녁 6시~자정', '일반쓰레기: 월·화·목·금 저녁 6시~자정'] },
+      { heading: '문의', items: ['미추홀구 자원순환과: 032-880-4384', '인천시 환경콜센터: 032-440-3355'] },
+    ]
+  },
+  'region-sejong': {
+    title: '세종시 분리배출 가이드',
+    icon: '#D44B0B',
+    color: '#FDE8E8',
+    sections: [
+      { heading: '세종시 분리배출 특징', items: ['거점 수거 방식 (클린하우스) 운영', '공동주택 단지 내 분리수거장 설치', 'RFID 음식물쓰레기 종량제 시행'] },
+      { heading: '품목별 요령', items: ['플라스틱: 내용물 비우고 라벨 제거 후 배출', '종이류: 물에 젖지 않게 묶어 배출', '유리병: 뚜껑 제거 후 색상별 분리배출', '의류: 의류수거함 또는 클린하우스 이용'] },
+      { heading: '음식물쓰레기', items: ['RFID 전용 용기 사용', '물기 최대한 제거 후 배출', '뼈·껍데기·씨앗류는 일반쓰레기로 배출'] },
+      { heading: '문의', items: ['세종시 환경과: 044-300-3543', '세종시청 홈페이지 > 분리배출 안내'] },
+    ]
+  },
+  'region-jeju': {
+    title: '제주도 분리배출 가이드',
+    icon: '#0B8BD4',
+    color: '#E8F4FB',
+    sections: [
+      { heading: '제주도 분리배출 특징', items: ['클린하우스(재활용도움센터) 거점 수거', '관광객 대상 분리배출 안내 강화', '해양쓰레기 수거 캠페인 운영'] },
+      { heading: '품목별 요령', items: ['플라스틱: 내용물 비우고 라벨 제거 후 배출', '페트병: 투명·유색 분리, 라벨 제거 후 압축 배출', '스티로폼: 수산물 상자 등 이물질 제거 후 배출', '비닐: 깨끗이 씻어 투명 봉투에 모아 배출'] },
+      { heading: '음식물쓰레기', items: ['종량제 봉투(노란색) 사용', '물기 최대한 제거 후 배출', '감귤 껍질은 음식물쓰레기로 배출 가능'] },
+      { heading: '문의', items: ['제주시 청소행정과: 064-728-3794', '서귀포시 청소행정과: 064-760-3194', '제주특별자치도 환경보전국: 064-710-6421'] },
+    ]
+  },
 };
 
 function openGuide(type) {
@@ -337,8 +373,8 @@ let quickQuestions = [...DEFAULT_QUICK_QUESTIONS];
 
 let _popularCache = null;
 
-async function fetchPopularQuestions() {
-  if (_popularCache) return _popularCache;
+async function fetchPopularQuestions(forceRefresh = false) {
+  if (_popularCache && !forceRefresh) return _popularCache;
   try {
     const res = await fetch('/api/popular-questions?limit=5', { credentials: 'include' });
     if (!res.ok) return [];
@@ -347,8 +383,8 @@ async function fetchPopularQuestions() {
   } catch (_) { return []; }
 }
 
-async function loadPopularQuestions() {
-  const data = await fetchPopularQuestions();
+async function loadPopularQuestions(forceRefresh = false) {
+  const data = await fetchPopularQuestions(forceRefresh);
   if (data.length >= 4) {
     quickQuestions = data.slice(0, 4).map(d => d.question);
     renderMessages();
@@ -654,6 +690,9 @@ async function askBackend(question) {
 
   isTyping = false;
   renderMessages();
+
+  // 질문 후 인기 질문 갱신
+  loadPopularQuestions(true);
 }
 
 // Enter 키로 전송
@@ -733,15 +772,22 @@ async function loadAdminRegionStats() {
 }
 
 async function loadAdminTopQuestions() {
-  const data = await fetchPopularQuestions();
-  const container = document.getElementById('top-questions-container');
-  if (!data.length) { container.innerHTML = '<p class="stat-placeholder">질문 데이터가 없습니다.</p>'; return; }
-  container.innerHTML = data.slice(0, 5).map((q, i) =>
-    `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px">
-      <span><strong>${i + 1}.</strong> ${q.question.length > 30 ? q.question.substring(0, 30) + '...' : q.question}</span>
-      <span style="color:#888;white-space:nowrap;margin-left:8px">${q.count}건</span>
-    </div>`
-  ).join('');
+  try {
+    const res = await fetch('/api/admin/top-questions?limit=5', { credentials: 'include' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const container = document.getElementById('top-questions-container');
+    if (!data.length) { container.innerHTML = '<p class="stat-placeholder">질문 데이터가 없습니다.</p>'; return; }
+    container.innerHTML = data.map((q, i) =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px">
+        <span><strong>${i + 1}.</strong> ${q.question.length > 30 ? q.question.substring(0, 30) + '...' : q.question}</span>
+        <span style="color:#888;white-space:nowrap;margin-left:8px">${q.count}건</span>
+      </div>`
+    ).join('');
+  } catch (_) {
+    const container = document.getElementById('top-questions-container');
+    container.innerHTML = '<p class="stat-placeholder">질문 데이터를 불러올 수 없습니다.</p>';
+  }
 }
 
 async function loadAdminDailyTrend() {
