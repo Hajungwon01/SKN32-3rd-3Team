@@ -209,7 +209,11 @@ def build_chunks(documents: list[dict]) -> list[dict]:
                     "owner_id": doc.get("owner_id"),
                     "title": doc.get("title", "제목 없음"),
                     "source_type": source_type,
-                    "region": doc.get("region", "common"),
+                    # region 이 None 이면 전국 공통 문서로 본다.
+                    # seed_docs._extract_region() 은 전국 공통(법령·환경부 가이드)에
+                    # None 을 돌려주는데, 검색 필터는 "common" 문자열을 찾으므로
+                    # 여기서 맞춰주지 않으면 법령이 통째로 검색에서 제외된다.
+                    "region": doc.get("region") or "common",
                     "chunk_index": chunk_index,
                     # 법령이면 "제15조", 가이드면 "품목별 분리배출 요령 > 종이류"
                     "label": piece["label"],
