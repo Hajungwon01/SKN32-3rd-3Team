@@ -157,7 +157,7 @@ def ask(
         "answer": sections.get("answer", "") or sections.get("guide", ""),
         "law": sections.get("law", ""),
         "tip": sections.get("tip", ""),
-        "source": ", ".join(s["title"] for s in source_list),
+        "source": ", ".join(dict.fromkeys(s["title"] for s in source_list)),
         "sources": source_list,
     }
 
@@ -320,7 +320,7 @@ def _load_from_files() -> list[dict]:
     supported = {".txt", ".md", ".pdf"}
     documents: list[dict] = []
 
-    search_dirs = [settings.GUIDE_DIR, settings.DOCS_DIR]
+    search_dirs = [settings.GUIDE_DIR, settings.DOCS_DIR, settings.LAWS_DIR]
 
     doc_id = 0
     for folder in search_dirs:

@@ -40,7 +40,7 @@ def _set_session_cookie(response: Response, token: str) -> None:
 
 
 def _to_auth_user(user: User) -> AuthUser:
-    return AuthUser(id=user.id, email=user.email, name=user.display_name)
+    return AuthUser(id=user.id, email=user.email, name=user.display_name, isAdmin="admin" in user.email.lower())
 
 
 def _to_document_summary(doc: Document) -> DocumentSummary:
