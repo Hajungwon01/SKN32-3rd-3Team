@@ -209,10 +209,10 @@ def _build_sources(results: list[dict]) -> list[dict]:
     seen: set = set()
 
     for item in results:
-        key = (item.get("document_id"), item.get("label"))
-        if key in seen:
+        cleaned = _clean_title(item.get("title", "제목 없음"))
+        if cleaned in seen:
             continue
-        seen.add(key)
+        seen.add(cleaned)
 
         snippet = " ".join(item["content"].split())
         if len(snippet) > SNIPPET_LENGTH:
@@ -337,9 +337,10 @@ def _load_from_files() -> list[dict]:
             doc_id += 1
             stem = path.stem
 
-            if stem.startswith("[법령]"):
+            # 폴더 기반 source_type 자동 태깅
+            if folder == settings.LAWS_DIR or stem.startswith("[법령]"):
                 source_type = "law"
-            elif stem.startswith("[가이드]"):
+            elif folder == settings.GUIDE_DIR or stem.startswith("[가이드]"):
                 source_type = "guide"
             else:
                 source_type = "manual"

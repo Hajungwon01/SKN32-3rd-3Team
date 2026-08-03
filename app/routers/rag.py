@@ -25,6 +25,8 @@ main.py 에서 `app.include_router(rag.router, prefix="/api")` 로 등록한다.
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -76,6 +78,8 @@ class ChatHistoryItem(BaseModel):
     role: str
     content: str
     created_at: str
+    tip: str = ""
+    sources: list[ChatSource] = []
 
 
 class ChatSessionGroup(BaseModel):
@@ -119,10 +123,12 @@ def chat(
         cid = _assign_cluster(db, question)
         db.add(ChatLog(user_id=user.id, question=question, region=req.region, has_answer=has_answer, cluster_id=cid))
 
-        # 대화 기록 저장 (복원/흐름 유지용) - 챗봇 답변
+        # 대화 기록 저장 (복원/흐름 유지용) - 챗봇 답변 (tip, sources 포함)
         db.add(ChatMessage(
             owner_id=user.id, session_id=req.session_id, region=req.region,
             role="assistant", content=result.get("answer", ""),
+            tip=result.get("tip", ""),
+            sources=json.dumps(result.get("sources", []), ensure_ascii=False),
         ))
         db.commit()
 
@@ -166,13 +172,30 @@ def chat_sessions(
             session_id=key,
             # region 컬럼이 없던 시절 데이터(레거시)는 기본값 seoul로.
             region=groups[key][-1].region or "seoul",
-            messages=[
-                ChatHistoryItem(role=m.role, content=m.content, created_at=m.created_at.isoformat())
-                for m in groups[key]
-            ],
+            messages=[_to_history_item(m) for m in groups[key]],
         )
         for key in order
     ]
+
+
+def _to_history_item(m: ChatMessage) -> ChatHistoryItem:
+    """ChatMessage row를 응답 스키마로 변환한다.
+
+    sources는 DB에 JSON 문자열로 저장돼 있어서 다시 파싱한다.
+    """
+    sources = []
+    if m.sources:
+        try:
+            sources = json.loads(m.sources)
+        except (ValueError, TypeError):
+            sources = []
+    return ChatHistoryItem(
+        role=m.role,
+        content=m.content,
+        created_at=m.created_at.isoformat(),
+        tip=m.tip or "",
+        sources=sources,
+    )
 
 
 def _load_recent_history(
