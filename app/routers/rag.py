@@ -30,7 +30,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ChatLog, ChatMessage, User
+from app.models import ChatLog, ChatMessage, QuestionCluster, User
 from app.routers.api import get_current_user
 from app.services import rag_service, vector_store_service
 
@@ -114,9 +114,10 @@ def chat(
     try:
         result = rag_service.ask(question, owner_id=user.id, region=req.region, history=history)
 
-        # 기존 통계 로그 (그대로 유지)
+        # 기존 통계 로그 + 클러스터 매칭
         has_answer = bool(result.get("answer")) and "찾을 수 없습니다" not in result.get("answer", "")
-        db.add(ChatLog(user_id=user.id, question=question, region=req.region, has_answer=has_answer))
+        cid = _assign_cluster(db, question)
+        db.add(ChatLog(user_id=user.id, question=question, region=req.region, has_answer=has_answer, cluster_id=cid))
 
         # 대화 기록 저장 (복원/흐름 유지용) - 챗봇 답변
         db.add(ChatMessage(
@@ -219,3 +220,70 @@ def search_chunks(req: RagSearchRequest, user: User = Depends(get_current_user))
 def index_status(user: User = Depends(get_current_user)):
     """인덱스가 만들어져 있는지 확인한다."""
     return {"index_exists": vector_store_service.index_exists()}
+
+
+def _assign_cluster(db: Session, question: str) -> int | None:
+    """새 질문을 기존 클러스터에 매칭하거나, 새 클러스터를 만든다.
+
+    임베딩 1회만 호출 → 기존 클러스터 벡터와 비교 → 유사도 0.85 이상이면 기존 클러스터에 편입.
+    """
+    import json
+    import numpy as np
+    from app.services import embedding_service
+
+    SIMILARITY_THRESHOLD = 0.85
+
+    try:
+        vec = embedding_service.embed_documents([question])[0]
+    except Exception:
+        return None
+
+    vec_arr = np.array(vec, dtype=np.float32)
+    norm = np.linalg.norm(vec_arr)
+    if norm > 0:
+        vec_arr = vec_arr / norm
+
+    # 기존 클러스터와 비교
+    clusters = db.query(QuestionCluster).all()
+    best_cluster = None
+    best_sim = -1.0
+
+    for cluster in clusters:
+        c_vec = np.array(json.loads(cluster.embedding), dtype=np.float32)
+        sim = float(np.dot(vec_arr, c_vec))
+        if sim >= SIMILARITY_THRESHOLD and sim > best_sim:
+            best_sim = sim
+            best_cluster = cluster
+
+    if best_cluster:
+        best_cluster.count += 1
+        db.flush()
+        return best_cluster.id
+    else:
+        # 새 클러스터 생성
+        new_cluster = QuestionCluster(
+            representative=question,
+            embedding=json.dumps(vec_arr.tolist()),
+            count=1,
+        )
+        db.add(new_cluster)
+        db.flush()
+        return new_cluster.id
+
+
+@router.get("/popular-questions")
+def popular_questions(
+    limit: int = 5,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """인기 질문 TOP N을 반환한다. (DB 저장된 클러스터 기반 — 임베딩 호출 없음)"""
+    clusters = (
+        db.query(QuestionCluster)
+        .order_by(QuestionCluster.count.desc())
+        .limit(limit)
+        .all()
+    )
+    if not clusters:
+        return []
+    return [{"question": c.representative, "count": c.count} for c in clusters]

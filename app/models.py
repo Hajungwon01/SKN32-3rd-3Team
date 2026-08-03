@@ -70,6 +70,16 @@ class Document(Base):
     )
 
 
+class QuestionCluster(Base):
+    """임베딩 클러스터링으로 묶인 질문 그룹. 대표 질문과 벡터를 저장."""
+    __tablename__ = "question_clusters"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    representative = Column(Text, nullable=False)  # 대표 질문 텍스트
+    embedding = Column(Text, nullable=False)        # JSON 직렬화된 벡터
+    count = Column(Integer, default=1)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class ChatLog(Base):
     """챗봇 질문 로그. 관리자 대시보드 통계용."""
     __tablename__ = "chat_logs"
@@ -78,6 +88,7 @@ class ChatLog(Base):
     question = Column(Text, nullable=False)
     region = Column(String(50), nullable=False, default="seoul")
     has_answer = Column(Boolean, default=True)  # 근거 기반 답변 성공 여부
+    cluster_id = Column(Integer, ForeignKey("question_clusters.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, server_default=func.now(), index=True)
     user = relationship("User")
 

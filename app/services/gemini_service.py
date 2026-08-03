@@ -1,22 +1,14 @@
 """
-Gemini 연동.
+LLM 연동 (Gemini / OpenAI 전환 가능).
 
-- generate_summary(prompt) : 문서 요약 (기존 · 요약 담당)
-- answer_with_context(...)  : RAG 답변 생성 (RAG 파트 추가)
+- generate_summary(prompt) : 문서 요약
+- answer_with_context(...)  : RAG 답변 생성
 
-google-genai 패키지가 없거나 GEMINI_API_KEY 가 비어 있으면
-예외를 던지지 않고 안내 문구를 돌려준다. 팀원이 키 없이도 서버를 띄울 수 있어야 하기 때문.
+.env의 LLM_BACKEND 값으로 백엔드 전환:
+  - "gemini" : Google Gemini API (기본)
+  - "openai" : OpenAI API
 
-    pip install google-genai
-
-[대화 기록/흐름 유지 기능 - 하정원]
-answer_with_context()에 history 파라미터를 추가했다 (기존 서명과 하위 호환:
-history를 안 넘기면 예전과 완전히 동일하게 동작). "그거 자세히 알려줘" 같은
-후속 질문이 이전 대화를 참고할 수 있도록, 프롬프트의 [근거] 앞에
-[이전 대화] 블록을 추가로 끼워넣는 방식으로 최소 침습적으로 구현했다.
-⚠️ <answer>/<tip> 태그 파싱 규칙(ANSWER_PROMPT)은 안 건드렸다 - 이 프롬프트는
-RAG 담당이 태그 형식까지 맞춰 정성 들여 짠 것이라, 히스토리 삽입이 이
-형식을 깨뜨리지 않는지는 실제 GEMINI_API_KEY로 다시 확인 필요(내일 논의).
+    pip install google-genai openai
 """
 
 from app.core.config import settings
@@ -26,7 +18,15 @@ from app.core.config import settings
 
 
 def _generate(prompt: str) -> str | None:
-    """Gemini 를 호출한다. 사용할 수 없는 상태면 None 을 돌려준다."""
+    """LLM_BACKEND에 따라 Gemini 또는 OpenAI를 호출한다."""
+    backend = settings.LLM_BACKEND.lower()
+    if backend == "openai":
+        return _generate_openai(prompt)
+    return _generate_gemini(prompt)
+
+
+def _generate_gemini(prompt: str) -> str | None:
+    """Gemini를 호출한다."""
     if not settings.GEMINI_API_KEY:
         return None
 
@@ -43,8 +43,40 @@ def _generate(prompt: str) -> str | None:
             contents=prompt,
         )
         return (response.text or "").strip() or None
-    except Exception as exc:  # 네트워크·할당량·모델명 오류 등
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "429" in msg or "quota" in msg or "rate" in msg or "resource exhausted" in msg:
+            print(f"[Gemini] API 할당량 초과: {exc}")
+            return "__QUOTA_EXCEEDED__"
         print(f"[Gemini] 호출 실패: {exc}")
+        return None
+
+
+def _generate_openai(prompt: str) -> str | None:
+    """OpenAI를 호출한다."""
+    if not settings.OPENAI_API_KEY:
+        return None
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        print("[OpenAI] openai 패키지가 설치되지 않았습니다.  pip install openai")
+        return None
+
+    try:
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model=settings.OPENAI_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+        )
+        return (response.choices[0].message.content or "").strip() or None
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "429" in msg or "quota" in msg or "rate" in msg:
+            print(f"[OpenAI] API 할당량 초과: {exc}")
+            return "__QUOTA_EXCEEDED__"
+        print(f"[OpenAI] 호출 실패: {exc}")
         return None
 
 
@@ -128,9 +160,20 @@ def answer_with_context(question: str, context: str, history: list[dict] | None 
     prompt = ANSWER_PROMPT.format(history_block=history_block, context=context, question=question)
     result = _generate(prompt)
 
-    if result is None:
+    if result == "__QUOTA_EXCEEDED__":
         return {
-            "answer": "[LLM 미연결] GEMINI_API_KEY 설정 후 다시 질문하세요.",
+            "answer": "현재 API 사용량이 초과되었습니다. 잠시 후 다시 질문해 주세요.",
+            "tip": "",
+        }
+
+    if result is None:
+        backend = settings.LLM_BACKEND.lower()
+        if backend == "openai":
+            msg = "[LLM 미연결] OPENAI_API_KEY 설정 후 다시 질문하세요."
+        else:
+            msg = "[LLM 미연결] GEMINI_API_KEY 설정 후 다시 질문하세요."
+        return {
+            "answer": msg,
             "tip": "",
         }
 

@@ -82,8 +82,15 @@ class Settings(BaseSettings):
     # 같은 임계값을 쓰면 전부 걸러지므로 개발용으로 따로 둔다.
     RAG_MIN_SCORE_LOCAL: float = 0.05
 
+    # ── LLM 백엔드 (답변 생성) ──
+    # "gemini" 또는 "openai"
+    LLM_BACKEND: str = "gemini"
+
     # 답변 생성에 쓸 Gemini 모델
     GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # 답변 생성에 쓸 OpenAI 모델
+    OPENAI_MODEL: str = "gpt-4o-mini"
 
     # ═══════════════ RAG 설정 (여기까지) ═══════════════
 
