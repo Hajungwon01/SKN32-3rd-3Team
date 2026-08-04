@@ -1,147 +1,153 @@
-# Ecobot - 생활 속 환경 실천 안내 챗봇
+# Ecobot — 지역 분리배출 RAG 챗봇
 
-RAG 기반 LLM 챗봇으로, 지역별(서울·천안·부산 남구) 분리배출 가이드와 환경 법령을 근거로 답변합니다.
+내가 사는 동네 분리배출 규정이 궁금할 때, 검색 대신 물어보면 되는 챗봇.
 
-## 기술 스택
+## 문제
 
-- **Backend** : FastAPI + SQLAlchemy + MySQL
-- **LLM** : Google Gemini (gemini-2.5-flash)
-- **벡터DB** : FAISS (faiss-cpu)
-- **임베딩** : Gemini Embedding / Local(개발용)
-- **Frontend** : 순수 HTML + CSS + JS (static/)
-- **인증** : JWT (httpOnly Cookie)
+분리배출 규정은 지자체마다 다르고, 법령 근거는 또 따로 찾아봐야 한다. "치킨 박스는 어떻게 버려야 해?"라는 간단한 질문에도, 사는 지역이 서울인지 부산 남구인지에 따라 답이 달라진다. 기존 지자체 안내 페이지는 PDF나 표로 되어 있어서 원하는 답을 바로 얻기 어렵다.
 
-## 프로젝트 구조
+**기존 서비스(환경부 "내 손안의 분리배출" 앱 등)와의 차이**: 품목 사전 검색 위주인 기존 앱과 달리, Ecobot은 대화형으로 질문하면 **거주 지역의 가이드 + 관련 법령 근거를 같이** 답한다. 자료에 없는 내용은 "찾을 수 없다"고 정직하게 답하는 걸 우선순위로 뒀다 (환각 방지).
+
+## 데모
+<img width="2556" height="1324" alt="image" src="https://github.com/user-attachments/assets/e28abdd9-06a1-4400-9f91-6e72fc48a0ca" />
+
+## 폴더 구조
 
 ```
 SKN32-3rd-3Team/
 ├── app/
-│   ├── main.py              # FastAPI 진입점
-│   ├── models.py            # SQLAlchemy ORM 모델
-│   ├── schemas.py           # Pydantic 스키마
-│   ├── database.py          # DB 엔진/세션
-│   ├── core/
-│   │   ├── config.py        # 환경변수 설정 (pydantic-settings)
-│   │   └── security.py      # JWT + bcrypt
-│   ├── routers/
-│   │   ├── api.py           # 인증 + 문서 CRUD
-│   │   └── rag.py           # RAG 채팅 엔드포인트
-│   └── services/
-│       ├── rag_service.py           # RAG 오케스트레이터
-│       ├── chunk_service.py         # 문서 청킹
-│       ├── embedding_service.py     # 임베딩 생성
-│       ├── vector_store_service.py  # FAISS 벡터 저장소
-│       └── gemini_service.py        # Gemini 답변 생성
-├── static/                  # 프론트엔드 (Ecobot UI)
-│   ├── index.html
-│   ├── style.css
-│   └── app.js
+│   ├── main.py
+│   ├── models.py, schemas.py, database.py
+│   ├── core/           # config.py, security.py
+│   ├── routers/        # api.py, rag.py, admin.py
+│   └── services/       # chunk/embedding/vector_store/gemini/rag/auth/document/tools_service.py
+├── static/             # app.js, index.html, style.css (실제 서빙되는 프론트)
+├── frontend/           # Vite/React (별도 프로젝트, 사용 여부 확인 필요)
+├── scripts/            # seed_docs.py, law_text.py, measure_threshold.py, create_user.py
+├── evals/              # qa_set.json, run_eval.py, run_eval_hybrid.py, run_ragas.py, run_report.py
 ├── data/
-│   ├── guide/               # 내부 문서 (분리배출 가이드)
-│   └── laws/                # 외부 문서 (법령 원문)
-├── requirements.txt
-├── .env                     # 환경변수 (직접 생성)
-└── run.sh                   # 실행 스크립트
+│   ├── laws/            # 법령 원문 9개
+│   └── guide/            # 지역별·공통 가이드 15개
+├── 산출물/               # 제출용 문서(README, 시스템 아키텍처 등)
+└── requirements.txt, run.sh, env.example
 ```
 
-## 실행 방법
+## 아키텍처
 
-### 1. 저장소 클론
-
-```bash
-git clone <repo-url>
-cd SKN32-3rd-3Team
+```
+브라우저 ──▶ API 라우터 ──▶ RAG 파이프라인 ──▶ MySQL / FAISS 인덱스 / LLM API
 ```
 
-### 2. 가상환경 생성 및 패키지 설치
+- **API 라우터**: 인증·문서 CRUD(`api.py`), 챗봇(`rag.py`), 관리자 대시보드(`admin.py`)
+- **RAG 파이프라인**: 청킹(법령은 조문 단위, 가이드는 품목 단위) → 임베딩 → FAISS 검색(지역 필터 + 지역/공통/법령 자리 배분) → LLM 답변 생성
+- 상세 구조·API 명세·ERD는 `산출물/시스템_아키텍처.md` 참고
+
+## 기술 선택 이유
+
+| 선택 | 왜 이걸, 왜 지금 |
+|---|---|
+| **조문/품목 단위 청킹** (700자 기계적 분할 대신) | 법령을 문자 수로 자르면 "제15조에 따라" 같은 정확한 인용이 깨진다. 조문 하나 = 청크 하나로 만들어서 검색 결과가 곧 인용 단위가 되게 했다 |
+| **지역/공통/법령 자리 배분** (`_apply_quota`) | 법령은 조문 수가 많아 청크 비중이 가이드를 90:10으로 압도한다. 유사도 순으로만 뽑으면 실생활 질문에도 법령만 걸려서, 지역·공통·법령 자리를 각각 보장했다 |
+| **LLM_BACKEND 스위치 (Gemini/OpenAI)** | Gemini 무료 등급 할당량을 실제로 소진해본 뒤, 하나가 막혀도 다른 백엔드로 즉시 전환 가능하게 만들었다 |
+| **임베딩 디스크 캐시** | 재인덱싱마다 전체 청크를 다시 임베딩하면 API 할당량·비용이 반복 소모된다. 같은 텍스트는 항상 같은 벡터이므로 캐싱했다 |
+| **LangChain 표준 인터페이스로 재포장** | 프로젝트 요구사항이었고, 실제로 필드 하나를 손으로 옮기다 빠뜨리는(예: 지역 정보 소실) 실수가 구조적으로 줄어드는 효과를 확인했다 |
+
+### 이 문제엔 이 기술이 필요 없어서 뺐다
+
+- **Cross-Encoder 리랭커**: 검색 정밀도를 높일 수 있다는 가설로 실험했으나, 실제 정답셋으로 측정한 결과 성능 차이가 없었다. 복잡도만 늘어나서 도입하지 않았다.
+- **BM25 하이브리드 검색**: 이 프로젝트 성격과 근본적으로 안 맞는 지점이 있다 — BM25는 **정확한 단어 일치**만 찾기 때문에 "계란"과 "달걀"처럼 같은 대상을 가리키는 동의어를 서로 다른 단어로 취급해 못 찾는다. 분리배출 질문은 이런 동의어·표현 차이가 흔해서(예: "계란/달걀", "휴지/화장지"), 의미 기반인 순수 임베딩 검색이 이 도메인에는 더 적합하다고 판단했다.
+
+## 실행 가이드
 
 ```bash
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# macOS / Linux
-source venv/bin/activate
-
+# 1. 가상환경 + 패키지
+python -m venv venv && venv\Scripts\activate
 pip install -r requirements.txt
-```
 
-### 3. 환경변수 설정
-
-프로젝트 루트에 `.env` 파일을 생성합니다.
-
-```env
-# DB
-DATABASE_URL=mysql+pymysql://<user>:<password>@<host>:3306/<dbname>
-
-# 인증
-SECRET_KEY=your-secret-key-here
-
-# Gemini
-GEMINI_API_KEY=your-gemini-api-key
-
-# RAG (선택 — 기본값이 있으므로 필요한 것만 오버라이드)
-RAG_SOURCE=db              # db 또는 files
-EMBEDDING_BACKEND=gemini   # gemini 또는 local(개발용)
-```
-
-### 4. MySQL 데이터베이스 생성
-
-```sql
+# 2. MySQL 준비 (Workbench 등에서)
 CREATE DATABASE ecora CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'app_user'@'localhost' IDENTIFIED BY 'app_password';
+GRANT ALL PRIVILEGES ON ecora.* TO 'app_user'@'localhost';
+
+# 3. .env 작성 (env.example 참고)
+DATABASE_URL=mysql+pymysql://app_user:app_password@localhost:3306/ecora
+SECRET_KEY=...
+GEMINI_API_KEY=... 또는 OPENAI_API_KEY=...
+LLM_BACKEND=gemini   # 또는 openai
+EMBEDDING_BACKEND=local   # 또는 gemini, openai
+
+# 4. 문서 적재 + 인덱싱
+python -m scripts.seed_docs
+
+# 5. 서버 실행
+uvicorn app.main:app --reload
 ```
 
-서버 최초 실행 시 테이블이 자동 생성됩니다 (`Base.metadata.create_all`).
+`localhost:8000` 접속, 데모 계정: `demo@example.com` / `demo1234`
 
-### 5. 서버 실행
+## 트러블슈팅 기록
 
-```bash
-# 방법 1: run.sh 사용 (Linux/macOS)
-chmod +x run.sh
-./run.sh
+### 1. 법령 원문이 DB에 저장되다가 중간에 끊김
 
-# 방법 2: 직접 실행
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
+- **문제 상황**: 법령 파일을 적재하면 "Incorrect string value" 에러가 나거나, 내용이 잘려서 저장됨
+- **원인 가설**: MySQL 기본 `TEXT` 컬럼은 65,535바이트까지만 저장 가능. 법령 원문(261KB)이 이 한계를 넘어서, 멀티바이트 문자 중간이 잘리며 에러가 났을 것으로 추정
+- **시도/검증**: SQLite로는 같은 파일이 문제없이 저장되는 걸 확인 → SQLite `TEXT`는 크기 제한이 없어서 로컬 개발 중엔 안 드러났던 문제로 판단
+- **해결**: `content`/`content_text`/`summary` 컬럼을 MySQL에서만 `LONGTEXT`로 매핑(`with_variant`)
+- **결과**: 법령 원문(조문 222개) 전체 적재 성공
 
-### 6. 접속
+### 2. 법령의 별표(부칙)가 조문 라벨에 묶여 잘못 인용됨
 
-브라우저에서 `http://localhost:8000` 으로 접속합니다.
+- **문제 상황**: 답변 화면에서 "별표 1"을 "제6조"로 잘못 인용하는 게 발견됨
+- **원인 가설**: `chunk_service.py`에서 별표가 직전 조문 라벨에 묶여서, 별표인데도 조문 번호로 인식되고 있을 것으로 추정
+- **시도/검증**: 실제 답변에 잘못된 조문 번호가 나오는 걸 확인해서 원인 특정
+- **해결**: 별표를 독립된 청크로 분리하고, `"별표 1"`이라는 별도 라벨을 부여
+- **결과**: 별표가 조문과 혼동되지 않고 정확한 라벨로 인용됨
 
-## RAG 문서 인덱싱
+### 3. 출처에 같은 문서명이 3번 반복 표시
 
-DB 없이 로컬 파일로 테스트하려면:
+- **문제 상황**: 답변 화면의 출처 목록에 같은 문서 제목이 3번 중복으로 나타남
+- **원인 가설**: `rag_service.py`가 출처 문자열을 조립할 때 제목 중복 제거를 안 하고 있을 것으로 추정
+- **시도/검증**: 실제 출처 목록을 확인해서 중복 원인 특정
+- **해결**: 출처 조립 시 제목 중복 제거 로직 추가
+- **결과**: 같은 문서는 한 번만 표시됨
 
-```env
-RAG_SOURCE=files
-EMBEDDING_BACKEND=local
-```
+### 4. 삭제한 파일의 옛 레코드가 DB에 남아 잘못된 제목으로 인용됨
 
-설정 후 `data/docs/` 폴더에 txt/md/pdf 파일을 넣고, 서버 실행 후 인덱스를 빌드합니다:
+- **문제 상황**: 파일 시스템에서는 삭제/이름 변경한 파일이, 답변 출처에는 옛 제목 그대로 나타날 수 있음
+- **원인 가설**: 파일 삭제·이름 변경이 DB에 자동으로 반영되지 않고 있을 것으로 추정 (트러블슈팅 1·5번의 "삭제 파일이 DB에 남는" 문제와 같은 계열)
+- **시도/검증**: `seed_docs.py`/`law_text.py`의 적재 로직 확인
+- **해결**: 폴더 기준으로 DB를 자동 동기화해서 삭제된 파일의 레코드도 같이 삭제하고, 법령 시행일 검사 경고를 추가
+- **결과**: 옛 레코드로 인한 오인용 가능성 차단
 
-```bash
-curl -X POST http://localhost:8000/api/rag/rebuild
-```
+### 5. local 해시 임베딩이 표면 문자열만 잡아 패러프레이즈를 놓침
 
-## API 엔드포인트
+- **문제 상황**: 위 3건을 포함해 여러 검색 품질 문제의 공통 원인으로, 초기 개발용 `local`(해시 기반) 임베딩이 지목됨
+- **원인 가설**: 해시 임베딩은 표면 문자열 일치만 포착해서, "아무 데나 버리면"과 "투기" 같은 **의미는 같지만 표현이 다른 문장(패러프레이즈)**을 같은 것으로 인식하지 못할 것으로 추정
+- **시도/검증**: 실제로 표현이 다른 질문에서 검색이 안 되는 것을 확인
+- **해결**: 상용 임베딩 API로 전환(최종 OpenAI, 1536차원) + 전체 재시드
+- **결과**: 의미 기반 검색이 정상화됨
 
-| Method | Path | 설명 |
-|--------|------|------|
-| POST | `/api/auth/register` | 회원가입 |
-| POST | `/api/auth/login` | 로그인 (JWT 쿠키 발급) |
-| POST | `/api/auth/logout` | 로그아웃 |
-| GET | `/api/auth/me` | 현재 사용자 정보 |
-| POST | `/api/chat` | RAG 챗봇 질문 |
-| POST | `/api/rag/rebuild` | 벡터 인덱스 재구축 |
-| GET | `/api/rag/status` | 인덱스 상태 확인 |
-| GET | `/api/health` | 헬스체크 |
+### 6. Git 협업 이슈
 
-## 팀원 및 역할
+- **`reset --soft` 후 원격 파일이 안 들어오는 문제**: `reset`은 브랜치 포인터만 옮기고 원격과는 무관하며, 원격 변경사항은 `fetch` + `rebase`로만 반영된다는 걸 팀에 정리해서 공유
+- **재발 방지**: 작업 시작 전 `pull --rebase` 습관화, non-fast-forward로 거절될 때 강제 push 대신 `rebase` 후 push
+- **실험 코드 분리**: 포크 + 테스트 브랜치를 따로 운용해서 실험 코드가 본선 코드에 섞이지 않게 함
 
-| 역할 | 담당 |
-|------|------|
-| A | 기반 인프라 / 인증 (models, schemas, security) |
-| B | 프론트엔드 + 문서 CRUD |
-| C | 데이터 수집 / 벡터DB |
-| D | LLM·RAG 파이프라인 + 관리자 대시보드 |
+## 성과 지표
+
+정답셋 30문항(`evals/qa_set.json`) · **LLM+규칙 혼합 평가**(`evals/run_report.py`) 기준 최종 확정 수치 (설정: `local` 임베딩, `gpt-4o-mini`, `RAG_MIN_SCORE=0.3`, `top_k=6`, 청크 700/100):
+
+| 지표 | 값 |
+|---|---|
+| 통과율 | 28/30 (93.3%) |
+| 평균 정답도(5점 만점) | 4.56 |
+| 환각률 | 6.7% |
+| 자료없음 대응률 | 100% |
+
+**개선 이력**: 프롬프트를 반복 수정하며 같은 정답셋으로 3차례 재측정 → 1차 83.3%(환각 13.3%) → 2차 86.7%(환각 10.0%) → **3차(최종) 93.3%(환각 6.7%)**. 자료없음 대응률도 1차 50% → 2·3차 100%로 개선됨.
+
+**참고**: 이전 버전(정답셋 25문항, 의미 유사도 기반 채점)에서는 통과율 80.0%·검색 정확도 81.0%로 측정됐으나, 평가 방식과 정답셋 규모가 바뀌어 위 수치로 대체됨. 상세 실험 과정은 `산출물/RAG_평가_보고서.md` 참고.
+
+**비용도 지표로 관리**: 임베딩 API 캐싱으로 재인덱싱 시 반복 호출 비용 절감, `LLM_BACKEND` 전환으로 할당량 초과 시에도 서비스 중단 없음. 단, 토큰 사용량 로깅(`usage_metadata`)은 아직 미구현.
+
+**환각 방지**: 검색 근거가 없으면 LLM을 호출하지 않고 즉시 "찾을 수 없음"으로 응답. 자료없음 대응률이 프롬프트 개선 후 100%까지 올라간 것을 확인함.
