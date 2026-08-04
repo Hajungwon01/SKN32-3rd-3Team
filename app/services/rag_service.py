@@ -41,6 +41,9 @@ SNIPPET_LENGTH = 140
 # 근거가 없을 때 쓰는 문구. 프롬프트의 지시문과 같은 표현을 쓴다.
 NO_ANSWER = "관련 자료를 찾을 수 없습니다"
 
+# LangChain FAISS 벡터스토어 저장 경로 (기존 index.faiss/chunks.json과는 별개 파일)
+_LANGCHAIN_INDEX_DIR = "langchain"
+
 
 def _effective_min_score(min_score: float | None) -> float:
     """유사도 임계값을 결정한다.
@@ -232,6 +235,108 @@ def ask(
         # RAGAS 평가용 원문 청크.
         # 라우터의 ChatResponse 가 걸러내므로 프론트 응답에는 포함되지 않는다.
         "contexts": [r["content"] for r in results],
+    }
+
+
+# ─────────────────── LangChain 경로 (신규, 병행) ───────────────────
+
+
+def rebuild_index_langchain(db=None) -> dict:
+    """LangChain FAISS 경로로 인덱스를 다시 만들고 디스크에 저장한다."""
+    documents = _load_documents(db)
+    vectorstore = vector_store_service.build_langchain_vectorstore(documents)
+
+    save_path = str(settings.INDEX_DIR / _LANGCHAIN_INDEX_DIR)
+    vectorstore.save_local(save_path)
+
+    return {
+        "documents": len(documents),
+        "source": settings.RAG_SOURCE,
+        "embedding_backend": settings.EMBEDDING_BACKEND,
+        "saved_to": save_path,
+    }
+
+
+def search_langchain(
+    query: str,
+    top_k: int | None = None,
+    owner_id: int | None = None,
+    min_score: float | None = None,
+    region: str | None = None,
+    balanced: bool = False,
+) -> list[dict]:
+    """LangChain FAISS 경로로 검색한다.
+
+    필터링·자리배분 규칙은 기존 search()와 완전히 동일하게 맞췄다
+    (_effective_min_score()/_apply_quota()를 그대로 재사용 - 새로 안 만듦).
+    """
+    top_k = top_k or settings.RAG_TOP_K
+    min_score = _effective_min_score(min_score)
+
+    save_path = str(settings.INDEX_DIR / _LANGCHAIN_INDEX_DIR)
+
+    from langchain_community.vectorstores import FAISS
+
+    embeddings = embedding_service._get_langchain_embeddings_class()()
+    vectorstore = FAISS.load_local(save_path, embeddings, allow_dangerous_deserialization=True)
+
+    fetch_k = max(
+        top_k,
+        settings.RAG_TOP_K_REGION + settings.RAG_TOP_K_COMMON + settings.RAG_TOP_K_LAW,
+    ) * 25
+    results = vector_store_service.search_with_langchain(vectorstore, query, fetch_k)
+
+    if owner_id is not None:
+        results = [
+            r for r in results
+            if r.get("owner_id") == owner_id
+            or r.get("source_type") in PUBLIC_SOURCE_TYPES
+        ]
+
+    if region:
+        results = [r for r in results if r.get("region") in (region, "common", None)]
+
+    results = [r for r in results if r.get("score", 0.0) >= min_score]
+
+    if balanced:
+        return _apply_quota(results, region)
+
+    return results[:top_k]
+
+
+def ask_langchain(
+    question: str,
+    owner_id: int,
+    region: str | None = None,
+    history: list[dict] | None = None,
+    top_k: int | None = None,
+) -> dict:
+    """LangChain 경로(search_langchain)로 검색하고 답변을 생성한다.
+
+    반환 형식은 기존 ask()와 동일하게 맞췄다. history는 기존 ask()처럼
+    호출부(rag.py)가 조회해서 넘겨주는 방식 그대로 받는다 - 대화 저장/조회
+    로직 자체는 안 건드리고, "검색" 부분만 LangChain 경로로 바꾸는 것이
+    이번 4단계의 목표라서 그렇다.
+    """
+    results = search_langchain(question, top_k, owner_id, region=region, balanced=True)
+
+    if not results:
+        return {
+            "answer": "관련 문서를 찾을 수 없습니다. 질문을 조금 더 구체적으로 바꿔 보세요.",
+            "tip": "",
+            "source": "",
+            "sources": [],
+        }
+
+    sections = _generate_answer(question, _build_context(results), history)
+    source_list = _build_sources(results)
+
+    return {
+        "answer": sections.get("answer", "") or sections.get("guide", ""),
+        "law": sections.get("law", ""),
+        "tip": sections.get("tip", ""),
+        "source": ", ".join(dict.fromkeys(s["title"] for s in source_list)),
+        "sources": source_list,
     }
 
 
