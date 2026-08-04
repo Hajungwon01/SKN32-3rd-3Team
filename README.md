@@ -29,7 +29,6 @@ SKN32-3rd-3Team/
 ├── data/
 │   ├── laws/            # 법령 원문 9개
 │   └── guide/            # 지역별·공통 가이드 15개
-├── alembic/             # DB 마이그레이션
 ├── 산출물/               # 제출용 문서(README, 시스템 아키텍처 등)
 └── requirements.txt, run.sh, env.example
 ```
