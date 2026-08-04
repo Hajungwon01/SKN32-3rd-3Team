@@ -22,7 +22,7 @@ SKN32-3rd-3Team/
 │   ├── routers/        # api.py, rag.py, admin.py
 │   └── services/       # chunk/embedding/vector_store/gemini/rag/auth/document/tools_service.py
 ├── static/             # app.js, index.html, style.css (실제 서빙되는 프론트)
-├── frontend/           # Vite/React (별도 프로젝트, 사용 여부 확인 필요)
+├── frontend/           
 ├── scripts/            # seed_docs.py, law_text.py, measure_threshold.py, create_user.py
 ├── evals/              # qa_set.json, run_eval.py, run_eval_hybrid.py, run_ragas.py, run_report.py
 ├── data/
